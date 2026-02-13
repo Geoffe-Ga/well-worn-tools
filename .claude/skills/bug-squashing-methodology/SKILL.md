@@ -5,7 +5,9 @@ description: >-
   Use when fixing bugs, debugging failures, or investigating defects.
   Covers RCA documentation, reproduction, TDD fix cycle, and PR workflow.
   Do NOT use for general feature development (use stay-green), CI
-  environment issues (use ci-debugging), or code reviews.
+  environment issues (use ci-debugging), code reviews (use
+  comprehensive-pr-review), or general git workflow like issue creation,
+  branching, and PRs (use git-workflow).
 metadata:
   author: Geoff
   version: 1.0.0
