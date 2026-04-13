@@ -1,6 +1,6 @@
 # Well-Worn Tools
 
-A curated collection of 19 Claude Code skills for software engineering excellence. Each skill follows Anthropic's production skill format with YAML frontmatter, progressive disclosure, and optimized triggering.
+A curated collection of 20 Claude Code skills for software engineering excellence. Each skill follows Anthropic's production skill format with YAML frontmatter, progressive disclosure, and optimized triggering.
 
 ## Skills
 
@@ -24,6 +24,7 @@ A curated collection of 19 Claude Code skills for software engineering excellenc
 | **stay-green** | 2-gate TDD workflow: Red-Green-Refactor + pre-commit quality checks |
 | **testing** | Comprehensive test writing with TDD, AAA pattern, and language-specific frameworks |
 | **tracer-code** | Incremental system building: wire the skeleton first, then replace stubs |
+| **user-facing-error-messages** | Audit and rewrite user-facing error messages so users can self-serve instead of emailing support |
 | **vibe** | Code style, naming conventions, and structural patterns for consistent codebases |
 
 ## Installation

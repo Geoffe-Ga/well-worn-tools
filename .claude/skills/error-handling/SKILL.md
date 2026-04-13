@@ -5,7 +5,9 @@ description: >-
   Use when designing error strategies, writing exception handling,
   creating custom error types, or implementing validation. Covers
   Python, TypeScript, Go, and Rust patterns.
-  Do NOT use for security-specific input validation (use security skill).
+  Do NOT use for security-specific input validation (use security skill)
+  or for auditing/rewriting the wording of user-facing error messages
+  (use user-facing-error-messages skill).
 metadata:
   author: Geoff
   version: 1.0.0
