@@ -6,7 +6,7 @@ A curated collection of 21 Claude Code skills for software engineering excellenc
 
 | Skill | Description |
 |-------|-------------|
-| **address-feedback** | Iterate on Claude PR review feedback with TDD, find the latest LGTM via GitHub MCP, and merge only when the LGTM matches HEAD and CI is green |
+| **address-feedback** | Iterate on Claude PR review feedback with TDD, parse the latest `Verdict:` from the Claude review comment posted by the GitHub Action, and merge only when the verdict is `LGTM` for the current HEAD and CI is green |
 | **architectural-decisions** | Structured trade-off analysis for choosing between libraries, patterns, and technologies |
 | **backlog-grooming** | Systematic GitHub backlog maintenance: review PRs, close issues, identify gaps |
 | **bug-squashing-methodology** | 5-step bug fix process with root cause analysis and TDD |
