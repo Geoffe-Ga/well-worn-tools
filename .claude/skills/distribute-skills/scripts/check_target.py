@@ -13,11 +13,21 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 DISCOVER = Path(__file__).with_name("discover.py")
+GH_MISSING_HINT = (
+    "error: `gh` CLI not found. In Claude Code cloud environments (web / iOS), "
+    "`gh` is not available — use the MCP-Only Flow at the bottom of SKILL.md."
+)
+
+
+def _require_gh() -> None:
+    if shutil.which("gh") is None:
+        sys.exit(GH_MISSING_HINT)
 
 
 def _local_distributable() -> set[str]:
@@ -29,6 +39,7 @@ def _local_distributable() -> set[str]:
 
 
 def _remote_skills(owner_repo: str) -> set[str]:
+    _require_gh()
     result = subprocess.run(
         ["gh", "api", f"repos/{owner_repo}/contents/.claude/skills"],
         capture_output=True, text=True,

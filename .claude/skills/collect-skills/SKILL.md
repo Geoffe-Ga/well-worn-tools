@@ -28,9 +28,31 @@ Pull skills from every other repo the current GitHub owner has, adapt them to fi
 
 ## Prerequisites
 
-- `gh` CLI authenticated for the current owner (`gh auth status`).
 - Python 3.10+.
 - Working tree clean enough that a per-skill commit makes sense.
+- For the local path: `gh` CLI authenticated for the current owner (`gh auth status`).
+- For the cloud path: GitHub MCP server tools (`mcp__github__*`) with read access to the owner's repos.
+
+## Execution Environment
+
+The Python helpers shell out to `gh`, which exists in some Claude Code environments and not others. Pick the path before doing anything:
+
+```bash
+if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] || ! command -v gh >/dev/null 2>&1; then
+  echo "cloud path — see 'MCP-Only Flow' at the bottom"
+else
+  echo "local path — Python helpers below"
+fi
+```
+
+| Environment | Path |
+|-------------|------|
+| Claude Code CLI (terminal) | local — Python helpers, `gh` works |
+| Claude Code desktop (Mac / Windows) | local — same |
+| Claude Code on the web (claude.ai/code) | cloud — MCP-only flow |
+| Claude Code on iOS / mobile | cloud — same as web |
+
+Both paths produce identical output; only the calling tools change. `adapt.py` is pure Python and is used in either path.
 
 ## Instructions
 
@@ -181,6 +203,21 @@ Confirm `gh auth status` shows the right account and the token's scopes include 
 
 ### Error: Two sibling repos have different versions of the same skill
 Treat the higher version as the trunk, diff-merge any unique additions from the other, and document the merge decision in the commit body.
+
+## MCP-Only Flow (Cloud Environments)
+
+When `gh` is not available, drive the same workflow with GitHub MCP tools. The shape is identical; only Steps 1-4 swap their backend.
+
+| Step | Local helper | MCP equivalent |
+|------|--------------|----------------|
+| 1. Owner | `discover.py owner` | Read `git remote get-url origin` via Bash; parse owner. (No GitHub call needed — pure git.) |
+| 2. List repos | `discover.py repos <owner>` | `mcp__github__search_repositories` with query `user:<owner>` (or `org:<owner>`). Filter out archived, forks, and well-worn-tools in the agent. |
+| 3. Find skills | `discover.py skills <owner>/<repo>` | `mcp__github__get_file_contents` on path `.claude/skills` — returns the directory listing. Confirm each subdir's `SKILL.md` with another `get_file_contents`. |
+| 4. Fetch skill | `fetch.py ...` | For each file under `.claude/skills/<name>/` (walk the tree with `get_file_contents`), save locally with the `Write` tool. Build the `.provenance.json` manually from the SHA returned by `mcp__github__get_commit`. |
+| 5. Adapt | `adapt.py <dir>` | Same — `adapt.py` is pure Python and works in both paths. |
+| 6-9. Resolve / move / validate / commit | Same | Same — local filesystem and git only. |
+
+MCP tool scope is bounded by the session's GitHub auth. If `mcp__github__search_repositories` does not return the expected sibling repos, the session is scoped to a single repo — request broader auth before continuing rather than partially-collecting.
 
 ## See Also
 

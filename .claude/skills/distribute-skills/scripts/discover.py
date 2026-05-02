@@ -22,11 +22,21 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 CURRENT_REPO_NAME = "well-worn-tools"
+GH_MISSING_HINT = (
+    "error: `gh` CLI not found. In Claude Code cloud environments (web / iOS), "
+    "`gh` is not available — use the MCP-Only Flow at the bottom of SKILL.md."
+)
+
+
+def _require_gh() -> None:
+    if shutil.which("gh") is None:
+        sys.exit(GH_MISSING_HINT)
 SKILLS_DIR = Path(".claude/skills")
 ORIGIN_PATTERNS = (
     re.compile(r"github\.com[:/]+(?P<owner>[^/]+)/(?P<repo>[^/.]+?)(?:\.git)?$"),
@@ -96,6 +106,7 @@ def cmd_local(_args: argparse.Namespace) -> int:
 
 
 def cmd_targets(args: argparse.Namespace) -> int:
+    _require_gh()
     try:
         result = _run(
             [

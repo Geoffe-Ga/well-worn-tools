@@ -32,6 +32,16 @@ from pathlib import Path
 
 DEFAULT_SOURCE_DIR = Path(".claude/skills")
 DEFAULT_BRANCH_PREFIX = "add-well-worn-skills"
+GH_MISSING_HINT = (
+    "error: `gh` CLI not found. In Claude Code cloud environments (web / iOS), "
+    "`gh` and local `git push` are not available — use the MCP-Only Flow at the "
+    "bottom of SKILL.md (mcp__github__create_branch + push_files + create_pull_request)."
+)
+
+
+def _require_gh() -> None:
+    if shutil.which("gh") is None:
+        sys.exit(GH_MISSING_HINT)
 
 
 def _run(cmd: list[str], cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -127,6 +137,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
 
+    _require_gh()
     source_dir = args.source_skills_dir.resolve()
     if not source_dir.is_dir():
         print(f"error: source skills dir not found: {source_dir}", file=sys.stderr)

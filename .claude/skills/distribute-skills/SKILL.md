@@ -28,10 +28,31 @@ Propagate well-worn-tools skills to sibling GitHub repos by opening one PR per t
 
 ## Prerequisites
 
-- `gh` CLI authenticated for the current owner (`gh auth status`).
-- `git` configured to push to the owner's repos (SSH or HTTPS with credentials).
 - Python 3.10+.
 - Working tree clean — the skill never reads from uncommitted local changes.
+- For the local path: `gh` CLI authenticated, plus `git` configured to push to the owner's repos.
+- For the cloud path: GitHub MCP server tools (`mcp__github__*`) with write access to each target repo.
+
+## Execution Environment
+
+The Python helpers shell out to `gh` and `git push`. Pick the path before doing anything:
+
+```bash
+if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] || ! command -v gh >/dev/null 2>&1; then
+  echo "cloud path — see 'MCP-Only Flow' at the bottom"
+else
+  echo "local path — Python helpers below"
+fi
+```
+
+| Environment | Path |
+|-------------|------|
+| Claude Code CLI (terminal) | local — Python helpers, `gh` + `git push` work |
+| Claude Code desktop (Mac / Windows) | local — same |
+| Claude Code on the web (claude.ai/code) | cloud — MCP-only flow |
+| Claude Code on iOS / mobile | cloud — same as web |
+
+Both paths produce identical PRs. `discover.py local` is pure Python and works in either path — the exemption logic does not depend on `gh`.
 
 ## Instructions
 
@@ -175,6 +196,24 @@ The default body lists each skill's name and description. Edit the PR after crea
 
 ### Error: A target needs additional setup files (e.g. CI hooks)
 Distribute deliberately ships only `.claude/skills/<name>/`. If the skills depend on a missing harness, add a checklist to the PR body so the target maintainer knows. Do not silently bundle unrelated config.
+
+## MCP-Only Flow (Cloud Environments)
+
+When `gh` and local `git push` are unavailable, drive the same workflow through GitHub MCP tools. The agent does the orchestration; no clone is needed because `mcp__github__push_files` writes directly to a remote branch in one commit.
+
+| Step | Local helper | MCP equivalent |
+|------|--------------|----------------|
+| 1. Owner | `discover.py owner` | Read `git remote get-url origin` via Bash; parse owner. (No GitHub call needed.) |
+| 2. Local skills | `discover.py local` | Same — pure Python, no `gh`. |
+| 3. Targets | `discover.py targets <owner>` | `mcp__github__search_repositories` with query `user:<owner>` (or `org:<owner>`); filter archived, forks, and well-worn-tools in the agent. |
+| 4. Diff target | `check_target.py <owner>/<repo>` | `mcp__github__get_file_contents` on the target's `.claude/skills` path; intersect with the local list to compute missing names. |
+| 5. Plan | (agent builds in-context) | Same — pure context work. |
+| 6. Distribute | `distribute.py ... [--dry-run]` | (a) `mcp__github__create_branch` on the target. (b) Read each local skill's files with the `Read` tool. (c) `mcp__github__push_files` once per target with all files for all selected skills, including a commit message that names the source SHA. (d) `mcp__github__create_pull_request` with title and body. |
+| 7. Verify | Open PR URL | Same — open the URL the MCP call returns. |
+
+The `--dry-run` semantics in cloud are: stop after step (b), report the file list and intended commit/PR text, and do not call `create_branch` or `push_files`. Implement this in the agent's plan, not in code.
+
+`push_files` refuses to overwrite if the path already exists in the target. That preserves the same overwrite-refusal contract `distribute.py` enforces — if a target already has the skill, fall back to `collect-skills`.
 
 ## See Also
 

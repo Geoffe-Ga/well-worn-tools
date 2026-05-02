@@ -15,12 +15,22 @@ import argparse
 import base64
 import datetime as dt
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 SKILL_SUBTREES = ("references", "scripts", "assets")
 SKILL_ROOT_FILE = "SKILL.md"
+GH_MISSING_HINT = (
+    "error: `gh` CLI not found. In Claude Code cloud environments (web / iOS), "
+    "`gh` is not available — use the MCP-Only Flow at the bottom of SKILL.md."
+)
+
+
+def _require_gh() -> None:
+    if shutil.which("gh") is None:
+        sys.exit(GH_MISSING_HINT)
 
 
 def _api(path: str, ref: str | None = None) -> tuple[int, str]:
@@ -74,6 +84,7 @@ def _walk_tree(owner_repo: str, path: str, ref: str) -> list[dict]:
 
 
 def fetch_skill(owner_repo: str, skill_name: str, dest: Path, ref: str | None = None) -> dict:
+    _require_gh()
     resolved_ref = ref or _resolve_default_branch(owner_repo)
     sha = _resolve_commit_sha(owner_repo, resolved_ref)
 
