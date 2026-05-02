@@ -6,7 +6,8 @@ description: >-
   API keys, or building web endpoints. Covers input validation, injection
   prevention, secret management, and XSS/CSRF protection across Python,
   TypeScript, Go, and Rust. Do NOT use for general error handling
-  (use error-handling skill).
+  (use error-handling skill) or for remediating dependency vulnerability
+  scanner failures and CVE / GHSA advisories (use cve-remediation skill).
 metadata:
   author: Geoff
   version: 1.0.0
