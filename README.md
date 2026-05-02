@@ -1,6 +1,6 @@
 # Well-Worn Tools
 
-A curated collection of 21 Claude Code skills for software engineering excellence. Each skill follows Anthropic's production skill format with YAML frontmatter, progressive disclosure, and optimized triggering.
+A curated collection of 22 Claude Code skills for software engineering excellence. Each skill follows Anthropic's production skill format with YAML frontmatter, progressive disclosure, and optimized triggering.
 
 ## Skills
 
@@ -13,6 +13,7 @@ A curated collection of 21 Claude Code skills for software engineering excellenc
 | **ci-debugging** | Debug CI test failures with structured protocol |
 | **comprehensive-pr-review** | 10-section PR review covering security, quality, testing, and docs |
 | **concurrency** | Safe concurrent code patterns across Python, TypeScript, Go, and Rust |
+| **cve-remediation** | Remediate dependency vulnerability scanner failures by verifying live registry data and upgrading; suppression is a documented last resort |
 | **documentation** | Language-specific documentation patterns for docstrings, module docs, and API references |
 | **error-handling** | Robust error handling that fails fast with clear diagnostics |
 | **file-naming-conventions** | ISO 8601 date-prefix naming for documents and plans |
