@@ -1,6 +1,6 @@
 # Well-Worn Tools
 
-A curated collection of 22 Claude Code skills for software engineering excellence. Each skill follows Anthropic's production skill format with YAML frontmatter, progressive disclosure, and optimized triggering.
+A curated collection of 24 Claude Code skills for software engineering excellence. Each skill follows Anthropic's production skill format with YAML frontmatter, progressive disclosure, and optimized triggering.
 
 ## Skills
 
@@ -11,9 +11,11 @@ A curated collection of 22 Claude Code skills for software engineering excellenc
 | **backlog-grooming** | Systematic GitHub backlog maintenance: review PRs, close issues, identify gaps |
 | **bug-squashing-methodology** | 5-step bug fix process with root cause analysis and TDD |
 | **ci-debugging** | Debug CI test failures with structured protocol |
+| **collect-skills** | Discover and ingest skills from sibling GitHub repos owned by the same user/org, with adaptation pass to fit well-worn-tools (`metadata.distribute: false`) |
 | **comprehensive-pr-review** | 10-section PR review covering security, quality, testing, and docs |
 | **concurrency** | Safe concurrent code patterns across Python, TypeScript, Go, and Rust |
 | **cve-remediation** | Remediate dependency vulnerability scanner failures by verifying live registry data and upgrading; suppression is a documented last resort |
+| **distribute-skills** | Push well-worn-tools skills outward to every sibling GitHub repo that lacks them via per-target PRs (`metadata.distribute: false`) |
 | **documentation** | Language-specific documentation patterns for docstrings, module docs, and API references |
 | **error-handling** | Robust error handling that fails fast with clear diagnostics |
 | **file-naming-conventions** | ISO 8601 date-prefix naming for documents and plans |
