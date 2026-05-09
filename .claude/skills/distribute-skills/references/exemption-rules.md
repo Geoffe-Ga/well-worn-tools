@@ -68,6 +68,14 @@ diff <(ls .claude/skills/) <(python .claude/skills/distribute-skills/scripts/dis
 
 The difference is exactly the exempt set.
 
+## Workflows Are Governed Separately
+
+`.github/workflows/*.yml` files have no frontmatter, so the `metadata.distribute: false` mechanism above does not apply. Workflow distribution is gated by an explicit allowlist in `scripts/distribute.py` (`DISTRIBUTABLE_WORKFLOWS`). A workflow ships only if its name is in that dict and a matching file is present under `--source-workflows-dir` (default `.github/workflows/`).
+
+The two gating models exist for the same reason: the right answer for "should this propagate?" lives next to the artifact (frontmatter for skills, an explicit registry for workflows), not in a separate config file that's easy to miss.
+
+To make a workflow distributable, add an entry to `DISTRIBUTABLE_WORKFLOWS` with the public name, the YAML filename, and the prose used in the PR body (`summary` + `requires`). Keep the entry conservative — every consumer of distribute-skills will see the workflow offered by name.
+
 ## Anti-Pattern: Whole-Repo Exemption Lists
 
 Earlier designs put the exempt list in a separate config file. This was rejected because:
