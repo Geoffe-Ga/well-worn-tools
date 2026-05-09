@@ -81,10 +81,9 @@ jobs:
           TOTAL=$(jq '.check_runs | length'                                       runs.json)
           GREEN=$(jq '[.check_runs[] | select(.conclusion=="success")] | length' runs.json)
 
-          gh api -X POST "repos/$REPO/issues/$PR/comments" -f body="$(cat <<EOF
-$MARKER
-**CI**: ${GREEN}/${TOTAL} Green
-**VERDICT**: ${VERDICT}
-**Action**: pull comment ${ID} to see in-depth feedback and continue iterating
-EOF
-)"
+          BODY=$(printf '%s\n%s\n%s\n%s\n' \
+            "$MARKER" \
+            "**CI**: ${GREEN}/${TOTAL} Green" \
+            "**VERDICT**: ${VERDICT}" \
+            "**Action**: pull comment ${ID} to see in-depth feedback and continue iterating")
+          gh api -X POST "repos/$REPO/issues/$PR/comments" -f body="$BODY"

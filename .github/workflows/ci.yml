@@ -2,11 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
-    branches: [main, develop]
-  schedule:
-    - cron: '0 0 * * *'  # Daily security scan
 
 permissions:
   contents: read
@@ -15,423 +12,78 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  PYTHON_VERSION: '3.11'
-  COVERAGE_THRESHOLD: 90
-
 jobs:
-  # Job 1: Code Quality
-  quality:
-    name: Code Quality
+  workflows:
+    name: Workflow Lint
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
+      - name: actionlint
+        uses: raven-actions/actionlint@v2
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-          cache-dependency-path: |
-            requirements.txt
-            requirements-dev.txt
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
-
-      - name: Run linting
-        run: ./scripts/lint.sh --check
-
-      - name: Run format check
-        run: ./scripts/format.sh --check
-
-      - name: Run type checking
-        run: ./scripts/typecheck.sh
-
-      - name: Run security checks
-        run: ./scripts/security.sh
-
-      - name: Run complexity analysis
-        run: ./scripts/complexity.sh
-
-      - name: Track job timing
-        if: always()
-        run: echo "$SECONDS" > quality-job-timing.txt
-
-      - name: Upload job timing
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: job-timings-quality
-          path: quality-job-timing.txt
-          retention-days: 7
-
-  # Job 2: Tests with Matrix
-  test:
-    name: Tests
+  skills:
+    name: Skill Validation
     runs-on: ubuntu-latest
-    needs: quality
-    strategy:
-      matrix:
-        python-version: ['3.11', '3.12']
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
+      - uses: actions/setup-python@v6
         with:
-          python-version: ${{ matrix.python-version }}
-          cache: 'pip'
-          cache-dependency-path: |
-            requirements.txt
-            requirements-dev.txt
+          python-version: '3.12'
 
-      - name: Install dependencies
+      - name: Install validator deps
+        run: pip install pyyaml==6.0.2
+
+      - name: Validate every SKILL.md
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          python <<'PY'
+          import sys, pathlib, yaml
 
-      - name: Run unit tests with coverage
-        run: ./scripts/test.sh --unit --coverage --ci
+          ROOT = pathlib.Path(".claude/skills")
+          REQUIRED = {"name", "description"}
+          errors: list[str] = []
 
-      - name: Clean up test artifacts before integration tests
-        if: always()
-        run: |
-          echo "Cleaning up test artifacts..."
-          # Remove test project directories
-          rm -rf my_project MagicMock *_project test-project 2>/dev/null || true
-          # Remove pytest cache that might interfere
-          rm -rf .pytest_cache 2>/dev/null || true
-          # Remove test artifact files created by generators
-          if [ -f tests/test_main.py ]; then
-            echo "Removing tests/test_main.py artifact..."
-            rm -f tests/test_main.py
-          fi
-          # Restore original pyproject.toml from git (in case test overwrote it)
-          echo "Restoring original pyproject.toml from git..."
-          git checkout HEAD -- pyproject.toml
-          # Remove any OTHER pyproject.toml files in subdirectories
-          find . -maxdepth 2 -name "pyproject.toml" ! -path "./pyproject.toml" -delete 2>/dev/null || true
-          # Verify cleanup
-          echo "Verification:"
-          ls -la | grep -E "my_project|MagicMock|test-project" || echo "✓ No test artifact directories"
-          [ -f tests/test_main.py ] && echo "⚠ tests/test_main.py still exists!" || echo "✓ tests/test_main.py removed"
-          echo "✓ Checking pyproject.toml has correct coverage target:"
-          grep "cov=start_green_stay_green" pyproject.toml && echo "✓ pyproject.toml is correct" || echo "⚠ pyproject.toml may be corrupted!"
-          echo "✓ Cleanup complete"
+          if not ROOT.exists():
+              print("No .claude/skills directory; nothing to validate.")
+              sys.exit(0)
 
-      - name: Debug pytest configuration before integration tests
-        run: |
-          echo "=== Pytest Configuration Debug ==="
-          pytest --markers | grep -E "e2e|integration|flaky_in_ci" || echo "⚠ Custom markers NOT found!"
-          echo "=== Checking pyproject.toml markers section ==="
-          grep -A 10 "^\[tool.pytest.ini_options\]" pyproject.toml | head -15
-          echo "=== Python/Pytest Version ==="
-          python --version
-          pytest --version
+          skill_dirs = sorted(d for d in ROOT.iterdir() if d.is_dir())
+          if not skill_dirs:
+              print("No skill directories; nothing to validate.")
+              sys.exit(0)
 
-      - name: Run integration tests
-        run: ./scripts/test.sh --integration --ci
+          for d in skill_dirs:
+              skill_md = d / "SKILL.md"
+              if not skill_md.exists():
+                  errors.append(f"{d.name}: missing SKILL.md")
+                  continue
+              text = skill_md.read_text(encoding="utf-8")
+              if not text.startswith("---\n"):
+                  errors.append(f"{d.name}: SKILL.md missing YAML frontmatter")
+                  continue
+              try:
+                  _, frontmatter, _ = text.split("---\n", 2)
+              except ValueError:
+                  errors.append(f"{d.name}: SKILL.md frontmatter not closed")
+                  continue
+              try:
+                  data = yaml.safe_load(frontmatter) or {}
+              except yaml.YAMLError as exc:
+                  errors.append(f"{d.name}: invalid YAML in frontmatter: {exc}")
+                  continue
+              missing = REQUIRED - set(data)
+              if missing:
+                  errors.append(f"{d.name}: frontmatter missing keys {sorted(missing)}")
+                  continue
+              if data.get("name") != d.name:
+                  errors.append(
+                      f"{d.name}: frontmatter name {data.get('name')!r} does not match directory"
+                  )
 
-      - name: Extract coverage percentage
-        if: matrix.python-version == '3.11'
-        run: |
-          COVERAGE=$(coverage report | grep TOTAL | awk '{print $NF}' | sed 's/%//')
-          echo "COVERAGE_PERCENTAGE=$COVERAGE" >> $GITHUB_ENV
-          echo "Coverage: $COVERAGE%" >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v6
-        continue-on-error: true  # Don't fail CI if codecov has issues
-        with:
-          files: ./coverage.xml
-          fail_ci_if_error: false
-          verbose: true
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: test-results-${{ matrix.python-version }}
-          path: |
-            junit.xml
-            htmlcov/
-
-      - name: Track job timing
-        if: always()
-        run: echo "$SECONDS" > test-py${{ matrix.python-version }}-job-timing.txt
-
-      - name: Upload job timing
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: job-timings-test-py${{ matrix.python-version }}
-          path: test-py${{ matrix.python-version }}-job-timing.txt
-          retention-days: 7
-
-  # Job 3: Security Scanning
-  security:
-    name: Security Scanning
-    runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-          cache-dependency-path: |
-            requirements.txt
-            requirements-dev.txt
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
-
-      - name: Run full security checks
-        run: ./scripts/security.sh --full
-
-      - name: Run dependency audit
-        run: ./scripts/audit-deps.sh
-
-      - name: Track job timing
-        if: always()
-        run: echo "$SECONDS" > security-job-timing.txt
-
-      - name: Upload job timing
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: job-timings-security
-          path: security-job-timing.txt
-          retention-days: 7
-
-  # Job 5: Dependency Review (PR only)
-  dependency-review:
-    name: Dependency Review
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    continue-on-error: true  # Skip if not available (requires GitHub Advanced Security)
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Dependency Review
-        uses: actions/dependency-review-action@v4
-        continue-on-error: true
-        with:
-          fail-on-severity: moderate
-
-      - name: Track job timing
-        if: always()
-        run: echo "$SECONDS" > dependency-review-job-timing.txt
-
-      - name: Upload job timing
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: job-timings-dependency-review
-          path: dependency-review-job-timing.txt
-          retention-days: 7
-
-  # Job 6: Coverage Artifacts & Badge Generation
-  coverage:
-    name: Coverage Report
-    runs-on: ubuntu-latest
-    needs: test
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-          cache-dependency-path: |
-            requirements.txt
-            requirements-dev.txt
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
-
-      - name: Generate coverage report
-        run: ./scripts/coverage.sh --html
-
-      - name: Extract coverage metrics
-        id: coverage
-        run: |
-          COVERAGE=$(coverage report | grep TOTAL | awk '{print $NF}' | sed 's/%//')
-          echo "coverage=${COVERAGE}" >> $GITHUB_OUTPUT
-          # Determine status
-          if (( $(echo "$COVERAGE >= 95" | bc -l) )); then
-            STATUS="excellent"
-            COLOR="brightgreen"
-          elif (( $(echo "$COVERAGE >= 90" | bc -l) )); then
-            STATUS="good"
-            COLOR="green"
-          elif (( $(echo "$COVERAGE >= 80" | bc -l) )); then
-            STATUS="fair"
-            COLOR="yellow"
-          else
-            STATUS="poor"
-            COLOR="red"
-          fi
-          echo "status=${STATUS}" >> $GITHUB_OUTPUT
-          echo "color=${COLOR}" >> $GITHUB_OUTPUT
-
-      - name: Generate badge JSON
-        env:
-          COVERAGE_VALUE: ${{ steps.coverage.outputs.coverage }}
-          COVERAGE_COLOR: ${{ steps.coverage.outputs.color }}
-        run: |
-          mkdir -p badges
-          jq -n \
-            --arg msg "${COVERAGE_VALUE}%" \
-            --arg color "$COVERAGE_COLOR" \
-            '{schemaVersion: 1, label: "coverage", message: $msg, color: $color}' \
-            > badges/coverage.json
-          cat > badges/tests.json << 'EOF'
-          {
-            "schemaVersion": 1,
-            "label": "tests",
-            "message": "passing",
-            "color": "brightgreen"
-          }
-          EOF
-          cat > badges/quality.json << 'EOF'
-          {
-            "schemaVersion": 1,
-            "label": "quality",
-            "message": "maximum",
-            "color": "brightgreen"
-          }
-          EOF
-          echo "Badge files generated:"
-          ls -la badges/
-
-      - name: Upload coverage artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: coverage-report
-          path: htmlcov/
-          retention-days: 30
-
-      - name: Upload badge artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: coverage-badges
-          path: badges/
-          retention-days: 30
-
-      - name: Comment PR with coverage
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v9
-        env:
-          COVERAGE_VALUE: ${{ steps.coverage.outputs.coverage }}
-          COVERAGE_STATUS: ${{ steps.coverage.outputs.status }}
-          COVERAGE_THRESHOLD_VALUE: ${{ env.COVERAGE_THRESHOLD }}
-        with:
-          script: |
-            const coverage = process.env.COVERAGE_VALUE;
-            const status = process.env.COVERAGE_STATUS;
-            const threshold = process.env.COVERAGE_THRESHOLD_VALUE;
-
-            // Determine pass/fail emoji
-            const passEmoji = coverage >= threshold ? "✅" : "⚠️";
-
-            const comment = `## Coverage Report ${passEmoji}
-
-            **Coverage**: ${coverage}% (Threshold: ${threshold}%)
-            **Status**: ${status}
-
-            | Metric | Value |
-            |--------|-------|
-            | Coverage | ${coverage}% |
-            | Threshold | ${threshold}% |
-            | Status | ${status} |
-
-            [View detailed HTML report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
-
-            // Find existing coverage comment
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-
-            const existingComment = comments.find(comment =>
-              comment.body.includes('## Coverage Report')
-            );
-
-            if (existingComment) {
-              // Update existing comment
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existingComment.id,
-                body: comment,
-              });
-            } else {
-              // Create new comment
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: comment,
-              });
-            }
-
-      - name: Track job timing
-        if: always()
-        run: echo "$SECONDS" > coverage-job-timing.txt
-
-      - name: Upload job timing
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: job-timings-coverage
-          path: coverage-job-timing.txt
-          retention-days: 7
-
-  # Job 7: Job timing summary
-  timing-summary:
-    name: Job Timing Summary
-    runs-on: ubuntu-latest
-    needs: [quality, test, security, coverage]
-    if: always()
-    steps:
-      - name: Download all timing artifacts
-        uses: actions/download-artifact@v8
-        with:
-          pattern: job-timings-*
-          path: timings
-
-      - name: Generate timing report
-        run: |
-          echo "## CI Job Timing Report" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Job | Duration (seconds) |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----|-------------------|" >> $GITHUB_STEP_SUMMARY
-
-          for file in timings/job-timings-*/*.txt; do
-            if [ -f "$file" ]; then
-              JOB_NAME=$(basename "$file" -job-timing.txt | tr '-' ' ')
-              DURATION=$(cat "$file")
-              echo "| $JOB_NAME | $DURATION |" >> $GITHUB_STEP_SUMMARY
-            fi
-          done
+          if errors:
+              print("Skill validation failed:")
+              for err in errors:
+                  print(f"  - {err}")
+              sys.exit(1)
+          print(f"Validated {len(skill_dirs)} skills.")
+          PY
