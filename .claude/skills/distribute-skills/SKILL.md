@@ -103,6 +103,7 @@ Show the plan to the user before any push. If the user wants to scope down (e.g.
 python .claude/skills/distribute-skills/scripts/distribute.py \
     <owner>/<repo> \
     --skills <skill-1> <skill-2> ... \
+    [--workflows iteration-trigger ...] \
     --branch add-well-worn-skills/$(date +%F) \
     [--dry-run]
 ```
@@ -111,12 +112,24 @@ The script:
 
 1. Clones the target repo into a temporary directory at the default branch.
 2. Creates the feature branch.
-3. Copies each requested skill from this checkout into `.claude/skills/<skill-name>/` of the clone, refusing to overwrite if the target already has a directory by that name.
+3. Copies each requested skill from this checkout into `.claude/skills/<skill-name>/` of the clone, refusing to overwrite if the target already has a directory by that name. If `--workflows` is set, also copies each named workflow YAML from `.github/workflows/` into the clone's `.github/workflows/`, with the same overwrite-refusal contract.
 4. Commits with a message that names the source SHA in well-worn-tools.
 5. Pushes the branch.
-6. Opens a PR via `gh pr create` with a body that lists each skill, its purpose (from frontmatter description), and a link back to well-worn-tools.
+6. Opens a PR via `gh pr create` with a body that lists each skill, each workflow (with its dependency notes), and a link back to well-worn-tools.
 
 `--dry-run` does steps 1-4 without pushing or opening the PR. Use it on the first target as a sanity check.
+
+At least one of `--skills` or `--workflows` is required. Skills-only invocations are unchanged from before; workflows are an additive opt-in.
+
+#### Distributable workflows
+
+Workflows have no `metadata.distribute` frontmatter, so distribution is governed by an explicit allowlist in `distribute.py` (`DISTRIBUTABLE_WORKFLOWS`). Currently:
+
+| Name | File | Purpose | Required setup in target |
+|------|------|---------|--------------------------|
+| `iteration-trigger` | `iteration-trigger.yml` | Posts a CI / Verdict / next-action summary comment as the repo owner whenever CI completes green and a Claude review exists, to wake a Claude Code mobile session via webhook. Capped at 10 self-posts per PR. | A workflow named `CI` (so `workflow_run` matches), repo secret `GEOFFE_GA_PAT` with `pull-requests: write`, and an active Claude review workflow producing comments with a `Verdict` line. |
+
+Add a workflow to the allowlist when it's generic enough that every Geoffe-Ga repo would benefit and its dependencies can be stated up front in the PR body.
 
 ### Step 7: Verify the PR Looks Right
 
@@ -169,7 +182,22 @@ $ python .claude/skills/distribute-skills/scripts/distribute.py \
 
 One PR introducing five skills is fine if the target is empty. Split across PRs if a single PR would obscure review.
 
-### Example 3: Refuse to Overwrite
+### Example 3: Distribute the iteration-trigger Workflow
+
+Pair the workflow with the address-feedback skill so the target repo has both halves of the loop (the nudge that wakes the session and the playbook the session follows):
+
+```bash
+$ python .claude/skills/distribute-skills/scripts/distribute.py \
+      Geoffe-Ga/some-service \
+      --skills address-feedback \
+      --workflows iteration-trigger \
+      --branch add-iteration-trigger/$(date +%F) \
+      --dry-run
+```
+
+The dry-run prints the planned commit; remove `--dry-run` once the PR plan looks right. The PR body lists the workflow's required secret (`GEOFFE_GA_PAT`) and the dependency on a `CI` workflow as a checklist item for the maintainer.
+
+### Example 4: Refuse to Overwrite
 
 ```bash
 $ python .claude/skills/distribute-skills/scripts/distribute.py \
@@ -208,7 +236,7 @@ When `gh` and local `git push` are unavailable, drive the same workflow through 
 | 3. Targets | `discover.py targets <owner>` | `mcp__github__search_repositories` with query `user:<owner>` (or `org:<owner>`); filter archived, forks, and well-worn-tools in the agent. |
 | 4. Diff target | `check_target.py <owner>/<repo>` | `mcp__github__get_file_contents` on the target's `.claude/skills` path; intersect with the local list to compute missing names. |
 | 5. Plan | (agent builds in-context) | Same — pure context work. |
-| 6. Distribute | `distribute.py ... [--dry-run]` | (a) `mcp__github__create_branch` on the target. (b) Read each local skill's files with the `Read` tool. (c) `mcp__github__push_files` once per target with all files for all selected skills, including a commit message that names the source SHA. (d) `mcp__github__create_pull_request` with title and body. |
+| 6. Distribute | `distribute.py ... [--dry-run]` | (a) `mcp__github__create_branch` on the target. (b) Read each local skill's files with the `Read` tool, plus `.github/workflows/<file>.yml` for any selected workflow. (c) `mcp__github__push_files` once per target with all files for all selected skills and workflows, including a commit message that names the source SHA. (d) `mcp__github__create_pull_request` with title and body — include the workflow dependency checklist (PAT, `CI` workflow name) in the body. |
 | 7. Verify | Open PR URL | Same — open the URL the MCP call returns. |
 
 The `--dry-run` semantics in cloud are: stop after step (b), report the file list and intended commit/PR text, and do not call `create_branch` or `push_files`. Implement this in the agent's plan, not in code.
