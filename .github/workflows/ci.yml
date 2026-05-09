@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  workflows:
+    name: Workflow Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: actionlint
+        uses: raven-actions/actionlint@v2
+
+  skills:
+    name: Skill Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install validator deps
+        run: pip install pyyaml==6.0.2
+
+      - name: Validate every SKILL.md
+        run: |
+          python <<'PY'
+          import sys, pathlib, yaml
+
+          ROOT = pathlib.Path(".claude/skills")
+          REQUIRED = {"name", "description"}
+          errors: list[str] = []
+
+          if not ROOT.exists():
+              print("No .claude/skills directory; nothing to validate.")
+              sys.exit(0)
+
+          skill_dirs = sorted(d for d in ROOT.iterdir() if d.is_dir())
+          if not skill_dirs:
+              print("No skill directories; nothing to validate.")
+              sys.exit(0)
+
+          for d in skill_dirs:
+              skill_md = d / "SKILL.md"
+              if not skill_md.exists():
+                  errors.append(f"{d.name}: missing SKILL.md")
+                  continue
+              text = skill_md.read_text(encoding="utf-8")
+              if not text.startswith("---\n"):
+                  errors.append(f"{d.name}: SKILL.md missing YAML frontmatter")
+                  continue
+              try:
+                  _, frontmatter, _ = text.split("---\n", 2)
+              except ValueError:
+                  errors.append(f"{d.name}: SKILL.md frontmatter not closed")
+                  continue
+              try:
+                  data = yaml.safe_load(frontmatter) or {}
+              except yaml.YAMLError as exc:
+                  errors.append(f"{d.name}: invalid YAML in frontmatter: {exc}")
+                  continue
+              missing = REQUIRED - set(data)
+              if missing:
+                  errors.append(f"{d.name}: frontmatter missing keys {sorted(missing)}")
+                  continue
+              if data.get("name") != d.name:
+                  errors.append(
+                      f"{d.name}: frontmatter name {data.get('name')!r} does not match directory"
+                  )
+
+          if errors:
+              print("Skill validation failed:")
+              for err in errors:
+                  print(f"  - {err}")
+              sys.exit(1)
+          print(f"Validated {len(skill_dirs)} skills.")
+          PY
