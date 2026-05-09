@@ -17,6 +17,7 @@ Subcommands:
 The `local` subcommand is the canonical source of truth for "what's
 distributable" — everything else in the skill defers to it.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -37,10 +38,10 @@ GH_MISSING_HINT = (
 def _require_gh() -> None:
     if shutil.which("gh") is None:
         sys.exit(GH_MISSING_HINT)
+
+
 SKILLS_DIR = Path(".claude/skills")
-ORIGIN_PATTERNS = (
-    re.compile(r"github\.com[:/]+(?P<owner>[^/]+)/(?P<repo>[^/.]+?)(?:\.git)?$"),
-)
+ORIGIN_PATTERNS = (re.compile(r"github\.com[:/]+(?P<owner>[^/]+)/(?P<repo>[^/.]+?)(?:\.git)?$"),)
 FRONTMATTER_BLOCK = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
 
 
@@ -110,9 +111,14 @@ def cmd_targets(args: argparse.Namespace) -> int:
     try:
         result = _run(
             [
-                "gh", "repo", "list", args.owner,
-                "--limit", str(args.limit),
-                "--json", "name,nameWithOwner,isArchived,isFork,defaultBranchRef",
+                "gh",
+                "repo",
+                "list",
+                args.owner,
+                "--limit",
+                str(args.limit),
+                "--json",
+                "name,nameWithOwner,isArchived,isFork,defaultBranchRef",
             ]
         )
     except subprocess.CalledProcessError as exc:

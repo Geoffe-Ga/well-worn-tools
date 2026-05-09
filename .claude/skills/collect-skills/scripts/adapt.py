@@ -12,6 +12,7 @@ emitted, so the report is loop-friendly:
 Findings are not auto-fixed. The agent reads each line and decides whether
 to generalize, drop, rewrite, or accept the pattern.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -20,6 +21,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 LIVE_SKILLS_DIR = Path(".claude/skills")
 EXPECTED_OWNER = "Geoffe-Ga"
@@ -49,7 +51,9 @@ def _local_skill_names() -> set[str]:
     return {p.name for p in LIVE_SKILLS_DIR.iterdir() if (p / "SKILL.md").is_file()}
 
 
-def _parse_frontmatter(text: str) -> tuple[dict, int] | tuple[None, int]:
+def _parse_frontmatter(
+    text: str,
+) -> tuple[dict[str, Any], int] | tuple[None, int]:
     """Best-effort YAML frontmatter parse without a yaml dependency.
 
     Returns (mapping, end_line) or (None, 0) if no frontmatter.
@@ -61,8 +65,8 @@ def _parse_frontmatter(text: str) -> tuple[dict, int] | tuple[None, int]:
         return None, 0
     body = match.group(1)
     end_line = text[: match.end()].count("\n")
-    parsed: dict = {}
-    metadata: dict = {}
+    parsed: dict[str, Any] = {}
+    metadata: dict[str, str] = {}
     in_metadata = False
     for raw_line in body.splitlines():
         if not raw_line.strip():
@@ -89,7 +93,7 @@ def scan_skill(skill_dir: Path) -> list[Finding]:
         return [Finding("MISSING_SKILL_MD", skill_dir.name, "no SKILL.md present")]
 
     text = skill_md.read_text()
-    frontmatter, header_lines = _parse_frontmatter(text)
+    frontmatter, _header_lines = _parse_frontmatter(text)
 
     # --- Frontmatter integrity ---
     if frontmatter is None:
@@ -103,18 +107,24 @@ def scan_skill(skill_dir: Path) -> list[Finding]:
             if key not in metadata:
                 findings.append(Finding("FRONTMATTER_MISSING", "frontmatter", f"missing metadata.{key}"))
         if metadata.get("author") and metadata["author"] not in {"Geoff", '"Geoff"', "'Geoff'"}:
-            findings.append(Finding(
-                "FRONTMATTER_DRIFT", "frontmatter",
-                f"metadata.author='{metadata['author']}' (expected 'Geoff')",
-            ))
+            findings.append(
+                Finding(
+                    "FRONTMATTER_DRIFT",
+                    "frontmatter",
+                    f"metadata.author='{metadata['author']}' (expected 'Geoff')",
+                )
+            )
 
         # --- Local skill name collision ---
         name = frontmatter.get("name", "").strip().strip('"').strip("'")
         if name and name in _local_skill_names() and skill_dir.parent.resolve() != LIVE_SKILLS_DIR.resolve():
-            findings.append(Finding(
-                "COLLISION", "frontmatter",
-                f"skill named '{name}' already exists locally — diff before moving",
-            ))
+            findings.append(
+                Finding(
+                    "COLLISION",
+                    "frontmatter",
+                    f"skill named '{name}' already exists locally — diff before moving",
+                )
+            )
 
         # --- Orphan cross-references in description ---
         description = frontmatter.get("description", "")
@@ -123,10 +133,13 @@ def scan_skill(skill_dir: Path) -> list[Finding]:
             if xref == name:
                 continue
             if xref not in local_names:
-                findings.append(Finding(
-                    "ORPHAN_XREF", "frontmatter",
-                    f"description references '(use {xref} skill)' but no local skill named '{xref}'",
-                ))
+                findings.append(
+                    Finding(
+                        "ORPHAN_XREF",
+                        "frontmatter",
+                        f"description references '(use {xref} skill)' but no local skill named '{xref}'",
+                    )
+                )
 
     # --- Body / file-content scans ---
     for path in sorted(skill_dir.rglob("*")):
@@ -147,10 +160,13 @@ def scan_skill(skill_dir: Path) -> list[Finding]:
             for owner, repo in EXTERNAL_REPO.findall(line):
                 if (owner, repo.removesuffix(".git")) == (EXPECTED_OWNER, EXPECTED_REPO):
                     continue
-                findings.append(Finding(
-                    "EXTERNAL_REPO_REF", f"{rel}:{lineno}",
-                    f"github.com/{owner}/{repo}",
-                ))
+                findings.append(
+                    Finding(
+                        "EXTERNAL_REPO_REF",
+                        f"{rel}:{lineno}",
+                        f"github.com/{owner}/{repo}",
+                    )
+                )
 
     return findings
 
@@ -169,12 +185,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.json:
         json.dump([f.__dict__ for f in findings], sys.stdout, indent=2)
         sys.stdout.write("\n")
+    elif not findings:
+        print("OK")
     else:
-        if not findings:
-            print("OK")
-        else:
-            for f in findings:
-                print(f.format())
+        for f in findings:
+            print(f.format())
     return 1 if findings else 0
 
 

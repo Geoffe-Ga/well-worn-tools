@@ -9,6 +9,7 @@ Mirrors `.claude/skills/<skill-name>/SKILL.md` plus the `references/`,
 (source repo, commit SHA, fetched-at timestamp) in `<dest-dir>/.provenance.json`
 so the agent can attribute the import in its commit message.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -19,6 +20,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 SKILL_SUBTREES = ("references", "scripts", "assets")
 SKILL_ROOT_FILE = "SKILL.md"
@@ -37,7 +39,7 @@ def _api(path: str, ref: str | None = None) -> tuple[int, str]:
     cmd = ["gh", "api", path]
     if ref:
         cmd.extend(["-f", f"ref={ref}"])
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     return result.returncode, result.stdout if result.returncode == 0 else result.stderr
 
 
@@ -45,14 +47,16 @@ def _resolve_default_branch(owner_repo: str) -> str:
     code, out = _api(f"repos/{owner_repo}")
     if code != 0:
         raise SystemExit(f"error: cannot read repo metadata for {owner_repo}: {out.strip()}")
-    return json.loads(out)["default_branch"]
+    branch: str = json.loads(out)["default_branch"]
+    return branch
 
 
 def _resolve_commit_sha(owner_repo: str, ref: str) -> str:
     code, out = _api(f"repos/{owner_repo}/commits/{ref}")
     if code != 0:
         raise SystemExit(f"error: cannot resolve ref {ref} on {owner_repo}: {out.strip()}")
-    return json.loads(out)["sha"]
+    sha: str = json.loads(out)["sha"]
+    return sha
 
 
 def _fetch_file(owner_repo: str, path: str, ref: str) -> bytes | None:
@@ -65,7 +69,7 @@ def _fetch_file(owner_repo: str, path: str, ref: str) -> bytes | None:
     return None
 
 
-def _walk_tree(owner_repo: str, path: str, ref: str) -> list[dict]:
+def _walk_tree(owner_repo: str, path: str, ref: str) -> list[dict[str, Any]]:
     """Return all file entries under `path`, recursively, via the tree API."""
     code, out = _api(f"repos/{owner_repo}/contents/{path}", ref=ref)
     if code != 0:
@@ -74,7 +78,7 @@ def _walk_tree(owner_repo: str, path: str, ref: str) -> list[dict]:
     if not isinstance(payload, list):
         return []
 
-    files: list[dict] = []
+    files: list[dict[str, Any]] = []
     for entry in payload:
         if entry["type"] == "file":
             files.append(entry)
@@ -83,7 +87,12 @@ def _walk_tree(owner_repo: str, path: str, ref: str) -> list[dict]:
     return files
 
 
-def fetch_skill(owner_repo: str, skill_name: str, dest: Path, ref: str | None = None) -> dict:
+def fetch_skill(
+    owner_repo: str,
+    skill_name: str,
+    dest: Path,
+    ref: str | None = None,
+) -> dict[str, Any]:
     _require_gh()
     resolved_ref = ref or _resolve_default_branch(owner_repo)
     sha = _resolve_commit_sha(owner_repo, resolved_ref)
@@ -131,8 +140,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     provenance = fetch_skill(args.owner_repo, args.skill_name, args.dest, args.ref)
-    print(f"Fetched {args.skill_name} from {args.owner_repo}@{provenance['sha'][:7]} "
-          f"into {args.dest} ({provenance['files_copied']} files)")
+    print(
+        f"Fetched {args.skill_name} from {args.owner_repo}@{provenance['sha'][:7]} "
+        f"into {args.dest} ({provenance['files_copied']} files)"
+    )
     return 0
 
 

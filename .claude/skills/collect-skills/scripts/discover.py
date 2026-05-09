@@ -16,6 +16,7 @@ Subcommands:
 
 All subcommands require an authenticated `gh` CLI.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -24,7 +25,6 @@ import re
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 
 CURRENT_REPO_NAME = "well-worn-tools"
 GH_MISSING_HINT = (
@@ -36,9 +36,9 @@ GH_MISSING_HINT = (
 def _require_gh() -> None:
     if shutil.which("gh") is None:
         sys.exit(GH_MISSING_HINT)
-ORIGIN_PATTERNS = (
-    re.compile(r"github\.com[:/]+(?P<owner>[^/]+)/(?P<repo>[^/.]+?)(?:\.git)?$"),
-)
+
+
+ORIGIN_PATTERNS = (re.compile(r"github\.com[:/]+(?P<owner>[^/]+)/(?P<repo>[^/.]+?)(?:\.git)?$"),)
 
 
 def _run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
@@ -65,9 +65,14 @@ def cmd_repos(args: argparse.Namespace) -> int:
     try:
         result = _run(
             [
-                "gh", "repo", "list", args.owner,
-                "--limit", str(args.limit),
-                "--json", "name,nameWithOwner,isArchived,isFork,defaultBranchRef",
+                "gh",
+                "repo",
+                "list",
+                args.owner,
+                "--limit",
+                str(args.limit),
+                "--json",
+                "name,nameWithOwner,isArchived,isFork,defaultBranchRef",
             ]
         )
     except subprocess.CalledProcessError as exc:
@@ -93,7 +98,9 @@ def cmd_skills(args: argparse.Namespace) -> int:
     owner_repo = args.owner_repo
     listing = subprocess.run(
         ["gh", "api", f"repos/{owner_repo}/contents/.claude/skills"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if listing.returncode != 0:
         # Treat missing directory as "no skills" rather than an error.
@@ -110,7 +117,9 @@ def cmd_skills(args: argparse.Namespace) -> int:
         # Confirm there is a SKILL.md inside.
         check = subprocess.run(
             ["gh", "api", f"repos/{owner_repo}/contents/.claude/skills/{name}/SKILL.md"],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         if check.returncode == 0:
             print(name)

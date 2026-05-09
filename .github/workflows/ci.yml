@@ -87,3 +87,36 @@ jobs:
               sys.exit(1)
           print(f"Validated {len(skill_dirs)} skills.")
           PY
+
+  python:
+    name: Python (lint, types, tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install dev tools
+        run: pip install ruff==0.15.8 mypy==1.19.1 pytest==9.0.2 pyyaml==6.0.2 types-PyYAML
+
+      - name: Ruff lint
+        run: ruff check .
+
+      - name: Ruff format check
+        run: ruff format --check .
+
+      # mypy is invoked once per source tree to avoid the duplicate-module
+      # error from the two `discover.py` files (one per skill).
+      - name: Mypy (distribute-skills)
+        run: mypy .claude/skills/distribute-skills/scripts/
+
+      - name: Mypy (collect-skills)
+        run: mypy .claude/skills/collect-skills/scripts/
+
+      - name: Mypy (tests)
+        run: mypy tests/
+
+      - name: Pytest
+        run: pytest

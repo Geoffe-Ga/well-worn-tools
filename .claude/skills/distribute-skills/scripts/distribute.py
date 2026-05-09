@@ -28,6 +28,7 @@ Distributable workflows are governed by the DISTRIBUTABLE_WORKFLOWS allowlist
 below, not by frontmatter (workflow YAML has none). Add a workflow here when
 it is generic enough to be useful in every Geoffe-Ga repo.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -127,10 +128,7 @@ def _validate_skills(source_dir: Path, skills: list[str], target_skills_dir: Pat
 def _validate_workflows(source_dir: Path, workflows: list[str], target_workflows_dir: Path) -> None:
     unknown = [name for name in workflows if name not in DISTRIBUTABLE_WORKFLOWS]
     if unknown:
-        raise SystemExit(
-            f"error: unknown workflow(s) {unknown}. "
-            f"Distributable: {sorted(DISTRIBUTABLE_WORKFLOWS)}"
-        )
+        raise SystemExit(f"error: unknown workflow(s) {unknown}. Distributable: {sorted(DISTRIBUTABLE_WORKFLOWS)}")
     for name in workflows:
         filename = DISTRIBUTABLE_WORKFLOWS[name]["filename"]
         src = source_dir / filename
@@ -168,14 +166,16 @@ def _build_pr_body(
         summary_bits.append(f"{len(skills)} skill(s)")
     if workflows:
         summary_bits.append(f"{len(workflows)} workflow(s)")
-    parts.extend([
-        "## Summary",
-        "",
-        f"Adds {' and '.join(summary_bits)} from [`Geoffe-Ga/well-worn-tools`]"
-        f"(https://github.com/Geoffe-Ga/well-worn-tools/tree/{source_sha[:7]}) "
-        "to this repo.",
-        "",
-    ])
+    parts.extend(
+        [
+            "## Summary",
+            "",
+            f"Adds {' and '.join(summary_bits)} from [`Geoffe-Ga/well-worn-tools`]"
+            f"(https://github.com/Geoffe-Ga/well-worn-tools/tree/{source_sha[:7]}) "
+            "to this repo.",
+            "",
+        ]
+    )
 
     if skills:
         parts.extend(["## Skills", ""])
@@ -193,28 +193,33 @@ def _build_pr_body(
             parts.append(f"  - **Requires:** {spec['requires']}")
         parts.append("")
 
-    parts.extend([
-        "## Provenance",
-        "",
-        f"Source SHA: `{source_sha}`",
-        "Distributed via the `distribute-skills` skill (`metadata.distribute: false`, "
-        "stays in well-worn-tools).",
-        "",
-        "## Test plan",
-        "",
-    ])
+    parts.extend(
+        [
+            "## Provenance",
+            "",
+            f"Source SHA: `{source_sha}`",
+            "Distributed via the `distribute-skills` skill (`metadata.distribute: false`, stays in well-worn-tools).",
+            "",
+            "## Test plan",
+            "",
+        ]
+    )
     if skills:
-        parts.extend([
-            "- [ ] Confirm `.claude/skills/` directory structure looks right",
-            "- [ ] Spot-check one SKILL.md frontmatter for syntax",
-            "- [ ] Decide whether each skill's triggers fit this repo's workflows",
-        ])
+        parts.extend(
+            [
+                "- [ ] Confirm `.claude/skills/` directory structure looks right",
+                "- [ ] Spot-check one SKILL.md frontmatter for syntax",
+                "- [ ] Decide whether each skill's triggers fit this repo's workflows",
+            ]
+        )
     if workflows:
-        parts.extend([
-            "- [ ] Confirm each new file under `.github/workflows/` parses (actionlint)",
-            "- [ ] Wire any required secrets noted under **Workflows** above",
-            "- [ ] Confirm any referenced workflow names exist in this repo",
-        ])
+        parts.extend(
+            [
+                "- [ ] Confirm each new file under `.github/workflows/` parses (actionlint)",
+                "- [ ] Wire any required secrets noted under **Workflows** above",
+                "- [ ] Confirm any referenced workflow names exist in this repo",
+            ]
+        )
     return "\n".join(parts)
 
 
@@ -245,13 +250,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("owner_repo", help="<owner>/<repo>")
     parser.add_argument("--skills", nargs="+", default=[], help="skill names to add")
     parser.add_argument(
-        "--workflows", nargs="+", default=[],
+        "--workflows",
+        nargs="+",
+        default=[],
         help=f"workflow names to add. Distributable: {sorted(DISTRIBUTABLE_WORKFLOWS)}",
     )
     parser.add_argument("--branch", default=None, help="feature branch name")
     parser.add_argument("--source-skills-dir", type=Path, default=DEFAULT_SOURCE_DIR)
     parser.add_argument(
-        "--source-workflows-dir", type=Path, default=DEFAULT_WORKFLOWS_SOURCE_DIR,
+        "--source-workflows-dir",
+        type=Path,
+        default=DEFAULT_WORKFLOWS_SOURCE_DIR,
         help="directory containing distributable workflow YAMLs (default: .github/workflows)",
     )
     parser.add_argument("--dry-run", action="store_true")
@@ -284,10 +293,7 @@ def main(argv: list[str] | None = None) -> int:
 
         target_skills_dir = clone_root / ".claude" / "skills"
         target_workflows_dir = clone_root / ".github" / "workflows"
-        print(
-            f"[3/6] Validating no overwrite for "
-            f"{len(args.skills)} skill(s), {len(args.workflows)} workflow(s) ..."
-        )
+        print(f"[3/6] Validating no overwrite for {len(args.skills)} skill(s), {len(args.workflows)} workflow(s) ...")
         if args.skills:
             assert source_skills is not None
             _validate_skills(source_skills, args.skills, target_skills_dir)
@@ -323,13 +329,13 @@ def main(argv: list[str] | None = None) -> int:
         print("[6/6] Opening PR ...")
         title = _build_pr_title(args.skills, args.workflows)
         body = _build_pr_body(
-            args.skills, args.workflows,
+            args.skills,
+            args.workflows,
             source_skills if source_skills is not None else Path("."),
             source_sha,
         )
         pr = _run(
-            ["gh", "pr", "create", "--repo", args.owner_repo,
-             "--head", branch, "--title", title, "--body", body],
+            ["gh", "pr", "create", "--repo", args.owner_repo, "--head", branch, "--title", title, "--body", body],
             cwd=clone_root,
         )
         print(pr.stdout.strip())

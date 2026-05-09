@@ -9,6 +9,7 @@ Reads the local distributable set via discover.py's `local` subcommand
 `.claude/skills/` over the GitHub API, and prints names that are local
 but absent on the target. Empty output means the target is up to date.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -33,7 +34,9 @@ def _require_gh() -> None:
 def _local_distributable() -> set[str]:
     result = subprocess.run(
         [sys.executable, str(DISCOVER), "local"],
-        capture_output=True, text=True, check=True,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     return {line for line in result.stdout.splitlines() if line.strip()}
 
@@ -42,7 +45,9 @@ def _remote_skills(owner_repo: str) -> set[str]:
     _require_gh()
     result = subprocess.run(
         ["gh", "api", f"repos/{owner_repo}/contents/.claude/skills"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if result.returncode != 0:
         # Missing directory means an empty target — every local skill is missing.
@@ -58,7 +63,9 @@ def _remote_skills(owner_repo: str) -> set[str]:
         name = entry["name"]
         check = subprocess.run(
             ["gh", "api", f"repos/{owner_repo}/contents/.claude/skills/{name}/SKILL.md"],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         if check.returncode == 0:
             names.add(name)
@@ -78,7 +85,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.json:
         json.dump(
             {"target": args.owner_repo, "local": sorted(local), "remote": sorted(remote), "missing": missing},
-            sys.stdout, indent=2,
+            sys.stdout,
+            indent=2,
         )
         sys.stdout.write("\n")
     else:
