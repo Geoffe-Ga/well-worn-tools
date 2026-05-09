@@ -81,9 +81,15 @@ jobs:
           TOTAL=$(jq '.check_runs | length'                                       runs.json)
           GREEN=$(jq '[.check_runs[] | select(.conclusion=="success")] | length' runs.json)
 
+          if [ "$GREEN" = "$TOTAL" ] && [ "$VERDICT" = "LGTM" ]; then
+            ACTION="You are cleared to squash merge, delete the branch, clean any worktrees, and unsubscribe from webhooks. Please proceed."
+          else
+            ACTION="pull comment ${ID} to see in-depth feedback and continue iterating"
+          fi
+
           BODY=$(printf '%s\n%s\n%s\n%s\n' \
             "$MARKER" \
             "**CI**: ${GREEN}/${TOTAL} Green" \
             "**VERDICT**: ${VERDICT}" \
-            "**Action**: pull comment ${ID} to see in-depth feedback and continue iterating")
+            "**Action**: ${ACTION}")
           gh api -X POST "repos/$REPO/issues/$PR/comments" -f body="$BODY"
