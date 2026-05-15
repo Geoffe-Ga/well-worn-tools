@@ -1,6 +1,6 @@
 # Well-Worn Tools
 
-A curated collection of 24 Claude Code skills for software engineering excellence. Each skill follows Anthropic's production skill format with YAML frontmatter, progressive disclosure, and optimized triggering.
+A curated collection of 25 Claude Code skills for software engineering excellence. Each skill follows Anthropic's production skill format with YAML frontmatter, progressive disclosure, and optimized triggering.
 
 ## Skills
 
@@ -25,6 +25,7 @@ A curated collection of 24 Claude Code skills for software engineering excellenc
 | **prompt-engineering** | Transform vague requests into effective 6-component prompts |
 | **security** | Secure coding practices against OWASP top 10 across four languages |
 | **skill-craft** | Meta-skill for building and validating production-quality skills |
+| **spec-decomposition** | Decompose a SPEC / PRD / RFC into sequenced GitHub epics and prompt-shaped child issues, written to `git-issues/` and filed with `gh issue create --body-file` |
 | **stay-green** | 2-gate TDD workflow: Red-Green-Refactor + pre-commit quality checks |
 | **testing** | Comprehensive test writing with TDD, AAA pattern, and language-specific frameworks |
 | **tracer-code** | Incremental system building: wire the skeleton first, then replace stubs |
