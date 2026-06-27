@@ -115,6 +115,9 @@ jobs:
       - name: Mypy (collect-skills)
         run: mypy .claude/skills/collect-skills/scripts/
 
+      - name: Mypy (discord-ralph-recap)
+        run: mypy .claude/skills/discord-ralph-recap/scripts/
+
       - name: Mypy (tests)
         run: mypy tests/
 

@@ -1,6 +1,6 @@
 # Well-Worn Tools
 
-A curated collection of 25 Claude Code skills for software engineering excellence. Each skill follows Anthropic's production skill format with YAML frontmatter, progressive disclosure, and optimized triggering.
+A curated collection of 26 Claude Code skills for software engineering excellence. Each skill follows Anthropic's production skill format with YAML frontmatter, progressive disclosure, and optimized triggering.
 
 ## Skills
 
@@ -15,6 +15,7 @@ A curated collection of 25 Claude Code skills for software engineering excellenc
 | **comprehensive-pr-review** | 10-section PR review covering security, quality, testing, and docs |
 | **concurrency** | Safe concurrent code patterns across Python, TypeScript, Go, and Rust |
 | **cve-remediation** | Remediate dependency vulnerability scanner failures by verifying live registry data and upgrading; suppression is a documented last resort |
+| **discord-ralph-recap** | Post a beautifully formatted Ralph tick-loop recap to Discord on every merged PR — merge rate, review iterations to LGTM, backlog ETA, and a ten-word "what this unlocked" headline |
 | **distribute-skills** | Push well-worn-tools skills outward to every sibling GitHub repo that lacks them via per-target PRs (`metadata.distribute: false`) |
 | **documentation** | Language-specific documentation patterns for docstrings, module docs, and API references |
 | **error-handling** | Robust error handling that fails fast with clear diagnostics |
