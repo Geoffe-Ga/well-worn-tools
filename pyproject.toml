@@ -42,11 +42,12 @@ namespace_packages = true
 mypy_path = [
     ".claude/skills/distribute-skills/scripts",
     ".claude/skills/collect-skills/scripts",
+    ".claude/skills/discord-ralph-recap/scripts",
     "tests",
 ]
 
 [[tool.mypy.overrides]]
-module = ["yaml", "pytest"]
+module = ["yaml", "pytest", "anthropic"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

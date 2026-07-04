@@ -1,9 +1,5 @@
 """Tests for the Ralph recap: pure stats helpers and the backlog count.
 
-Run from the repo root with:
-
-    python -m pytest scripts/ralph -q
-
 `stats.py` is pure and tested directly. `recap.py` is the I/O shell; only its
 project-specific backlog filtering is unit-tested here (network calls are
 monkeypatched), since everything else is a thin wrapper over `stats`.
@@ -12,12 +8,12 @@ monkeypatched), since everything else is a thin wrapper over `stats`.
 from __future__ import annotations
 
 import datetime as dt
-from typing import Any
+import urllib.error
+from typing import Any, ClassVar
 
 import pytest
-
-import recap
-import stats as rs
+from conftest import ralph_recap as recap
+from conftest import ralph_stats as rs
 
 UTC = dt.timezone.utc
 
@@ -290,8 +286,6 @@ def test_pr_churn_reads_detail_fields(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_pr_churn_degrades_to_zero_on_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    import urllib.error
-
     def _boom(*_a: Any, **_k: Any) -> dict[str, Any]:
         raise urllib.error.URLError("network down")
 
@@ -311,10 +305,7 @@ def test_fetch_repo_net_lines_none_when_stats_still_warming(monkeypatch: pytest.
     # A 202 from GitHub yields an empty body (None); retries exhaust to None.
     # Inject a no-op sleep so the backoff doesn't actually wait.
     monkeypatch.setattr(recap, "_request_json", lambda *a, **k: None)
-    assert (
-        recap.fetch_repo_net_lines("owner/repo", token="t", attempts=2, sleep=lambda _s: None)
-        is None
-    )
+    assert recap.fetch_repo_net_lines("owner/repo", token="t", attempts=2, sleep=lambda _s: None) is None
 
 
 def test_fetch_repo_net_lines_warms_to_data_after_backoff(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -348,8 +339,6 @@ def test_loc_line_renders_zero_net_not_dash() -> None:
 
 
 def test_fetch_repo_net_lines_none_on_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    import urllib.error
-
     def _boom(*_a: Any, **_k: Any) -> object:
         raise urllib.error.HTTPError("u", 500, "err", {}, None)  # type: ignore[arg-type]
 
@@ -422,7 +411,7 @@ class _Response:
 class _FakeAnthropic:
     """Minimal stand-in for the anthropic SDK that records create() kwargs."""
 
-    last_kwargs: dict[str, Any] = {}
+    last_kwargs: ClassVar[dict[str, Any]] = {}
 
     class _Client:
         def __init__(self) -> None:
@@ -433,7 +422,7 @@ class _FakeAnthropic:
             _FakeAnthropic.last_kwargs = kwargs
             return _Response([_Block("Energy ledger now powers daily streaks")])
 
-    def Anthropic(self) -> "_FakeAnthropic._Client":  # noqa: N802 - mirrors the SDK's class name
+    def Anthropic(self) -> _FakeAnthropic._Client:
         return _FakeAnthropic._Client()
 
 
@@ -466,7 +455,7 @@ def test_generate_headline_falls_back_when_sdk_absent(monkeypatch: pytest.Monkey
 
 def test_generate_headline_falls_back_on_sdk_error(monkeypatch: pytest.MonkeyPatch) -> None:
     class _Boom:
-        def Anthropic(self) -> object:  # noqa: N802 - mirrors the SDK's class name
+        def Anthropic(self) -> object:
             raise RuntimeError("api down")
 
     monkeypatch.setattr(recap, "_anthropic_mod", _Boom())

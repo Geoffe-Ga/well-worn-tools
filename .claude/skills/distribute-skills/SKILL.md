@@ -143,10 +143,9 @@ A **bundle** is a set of repo-relative paths (files or whole directories) that o
 | `ralph-loop` | `.claude/agents/` (chief-architect + specialist taxonomy + `ralph-worker`), `.claude/commands/ralph-tick.md`, `scripts/ralph/` fleet mechanics (`fleet.sh`, `pick-next.sh`, `pr-ready.sh`, `FLEET.md`, `PROMPT.md`, `state.json`, tests) | Fill in the stack/threshold placeholders in `shared/house-rules.md`; `scripts/<side>/check-all.sh` must exist (see `quality-gate-scripts`); `gh` CLI; the `stay-green`/`ci-debugging`/`address-feedback` skills |
 | `maintenance-scans` | The reusable scan core + all `scan-*.yml` wrappers, `deslop.yml`, `hopper.yml`, `labels-bootstrap.yml`, `.github/deslop-areas.json`, `prompts/scans/`, `prompts/templates/scan-issue-body.md`, `scripts/setup-scan-labels.sh` | The `scan-issue-writer` and `de-slopify` skills; secret `CLAUDE_CODE_OAUTH_TOKEN`; run `labels-bootstrap.yml` once after merge; edit `deslop-areas.json` for this project's real product areas |
 | `dependabot-ralph-bridge` | `.github/workflows/dependabot-to-ralph-issue.yml` | The `ralph-loop` bundle; secret `RALPH_BOT_PAT` recommended |
-| `ralph-recap` | `scripts/ralph/recap.py`, `stats.py`, `RECAP.md`, tests, `.github/workflows/ralph-recap*.yml` | Secrets `DISCORD_BOT_TOKEN` + `RALPH_CHANNEL_ID`; optional `ANTHROPIC_API_KEY` |
 | `quality-gate-scripts` | `scripts/backend/`, `scripts/frontend/`, `scripts/dev-setup.sh`, `scripts/pre-deploy-check.sh` | Adapt tool invocations to the target's actual stack — see `scripts/README.md` |
 
-Add a bundle to the allowlist when a piece of scaffolding is generic enough to help most target repos but spans more than one top-level directory, so `--skills`/`--workflows` can't express it alone.
+Add a bundle to the allowlist when a piece of scaffolding is generic enough to help most target repos but spans more than one top-level directory, so `--skills`/`--workflows` can't express it alone. The Discord merge recap is deliberately **not** a bundle — it's a self-contained skill (`discord-ralph-recap`), so it ships via `--skills` instead.
 
 ### Step 7: Verify the PR Looks Right
 

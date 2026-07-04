@@ -103,6 +103,8 @@ jobs:
           # The working contract, stated verbatim, with a `{PR}` placeholder.
           # Kept on one source line so it stays indented inside the YAML block
           # scalar (a heredoc at column 1 would terminate the scalar).
+          # shellcheck disable=SC2016  # single-quoted on purpose: the literal
+          # backticks/`{PR}` placeholder must NOT be shell-expanded.
           contract='Adopt Dependabot PR #{PR} (its branch is already linked via `Closes`). Rebase on `main`, run the relevant `./scripts/<side>/check-all.sh`. **Upgrade fully — if the new major requires code changes, make them** (TDD the adaptation per `stay-green`; no pins-back, no `# type: ignore`, no weakening a gate). Push fixes **to the Dependabot branch**, drive CI + the Claude review to green, squash-merge. Merging closes this issue.'
 
           # File a Ralph-ready `dependencies` issue for one PR and append

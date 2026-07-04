@@ -11,7 +11,8 @@ name: Ralph Recap
 # `vars` entry, so it resolves whether you store it as a Secret or a Variable.
 #
 # The built-in GITHUB_TOKEN supplies the merge history (read-only). See
-# scripts/ralph/RECAP.md for setup, the metric definitions, and tuning.
+# .claude/skills/discord-ralph-recap/references/metrics.md for the metric
+# definitions and tuning.
 
 on:
   pull_request:
@@ -47,4 +48,5 @@ jobs:
           RALPH_CHANNEL_ID: ${{ secrets.RALPH_CHANNEL_ID || vars.RALPH_CHANNEL_ID }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || vars.ANTHROPIC_API_KEY }}
         run: |
-          python scripts/ralph/recap.py --repo "${{ github.repository }}"
+          python .claude/skills/discord-ralph-recap/scripts/recap.py \
+            --repo "${{ github.repository }}"

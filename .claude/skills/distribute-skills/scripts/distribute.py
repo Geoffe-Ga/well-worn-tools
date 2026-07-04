@@ -183,25 +183,6 @@ DISTRIBUTABLE_BUNDLES: dict[str, dict[str, object]] = {
             "recommended (falls back to `GITHUB_TOKEN` otherwise)."
         ),
     },
-    "ralph-recap": {
-        "paths": [
-            "scripts/ralph/recap.py",
-            "scripts/ralph/stats.py",
-            "scripts/ralph/RECAP.md",
-            "scripts/ralph/test_recap_stats.py",
-            ".github/workflows/ralph-recap.yml",
-            ".github/workflows/ralph-recap-tests.yml",
-        ],
-        "summary": (
-            "Posts a Discord embed recap (this PR's stats + rolling loop stats: "
-            "merge rate, review iterations, backlog ETA) every time a PR merges."
-        ),
-        "requires": (
-            "(a) repo secrets `DISCORD_BOT_TOKEN` and `RALPH_CHANNEL_ID`; "
-            "(b) `ANTHROPIC_API_KEY` optional, for the Claude-written headline; "
-            "(c) see `scripts/ralph/RECAP.md` for full setup and metric definitions."
-        ),
-    },
     "quality-gate-scripts": {
         "paths": [
             "scripts/backend",
@@ -420,8 +401,7 @@ def _build_pr_body(
     if bundles:
         parts.extend(
             [
-                "- [ ] Wire any required secrets/skills/sibling bundles noted under "
-                "**Scaffolding bundles** above",
+                "- [ ] Wire any required secrets/skills/sibling bundles noted under **Scaffolding bundles** above",
                 "- [ ] Fill in the stack/threshold placeholders these files ship with "
                 "(e.g. `shared/house-rules.md`, `deslop-areas.json`) for this project",
                 "- [ ] Confirm each new file under `.github/workflows/` parses (actionlint)",

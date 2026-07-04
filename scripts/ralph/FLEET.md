@@ -140,8 +140,8 @@ GitHub**, never from stored bookkeeping, so the loop stays re-entrant.
 
 ## Tests
 
-Two offline suites cover the fleet, both run in CI by
-`.github/workflows/ralph-recap-tests.yml` on any `scripts/ralph/**` change:
+Three offline suites cover the fleet, all run in CI by
+`.github/workflows/ralph-fleet-tests.yml` on any `scripts/ralph/**` change:
 
 - `scripts/ralph/test_fleet.sh` builds a throwaway repo (with an `origin` remote
   and a fake `gh`) and exercises assign / list / count / free / path / sync
@@ -150,10 +150,15 @@ Two offline suites cover the fleet, both run in CI by
   parallel-awareness: first-worker-lowest, worktree exclusion, in-flight-PR
   exclusion, the `solo` guard (candidate and active), the same-epic guard, the
   `parallelizable` override, and `RALPH_RESPECT_EPICS=0`.
+- `scripts/ralph/test_pr_ready.sh` stubs `gh` and exercises the merge-readiness
+  classifier: CI exit-code mapping, `mergeStateStatus` (CLEAN/BEHIND), and the
+  stale-verdict guard (an LGTM comment posted before the current HEAD push
+  does not count).
 
 ```bash
 bash scripts/ralph/test_fleet.sh
 bash scripts/ralph/test_pick_next.sh
+bash scripts/ralph/test_pr_ready.sh
 ```
 
 ## Failure modes and how they're handled

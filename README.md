@@ -18,6 +18,7 @@ A curated collection of Claude Code skills for software engineering excellence, 
 | **continue-epic** | Pick up the next incomplete issue from a local file-based roadmap (`prompts/github-issues/`) and drive it to a merge-ready PR via TDD — a lighter-weight alternative to the Ralph loop for projects without a GitHub-issue backlog |
 | **cve-remediation** | Remediate dependency vulnerability scanner failures by verifying live registry data and upgrading; suppression is a documented last resort |
 | **de-slopify** | Audit the codebase for sloppy, amateurish, or AI-generated low-quality code and file corroborated findings as Ralph-ready GitHub issues |
+| **discord-ralph-recap** | Post a beautifully formatted Ralph tick-loop recap to Discord on every merged PR — merge rate, review iterations to LGTM, backlog ETA, and a ten-word "what this unlocked" headline |
 | **distribute-skills** | Push well-worn-tools skills, workflows, and multi-directory scaffolding bundles (e.g. the Ralph loop) outward to any target repo via per-target PRs (`metadata.distribute: false`) |
 | **documentation** | Language-specific documentation patterns for docstrings, module docs, and API references |
 | **error-handling** | Robust error handling that fails fast with clear diagnostics |
@@ -50,8 +51,9 @@ Beyond skills, this repo ships an opinionated, drop-in scaffold for an autonomou
 | `ralph-loop` | `.claude/agents/` (chief-architect + 6 specialists + `ralph-worker`), `.claude/commands/ralph-tick.md`, `scripts/ralph/` fleet mechanics | A re-entrant orchestrator that keeps up to `max_workers` git-worktree lanes moving independently through TDD → local quality gate → CI → Claude review → merge |
 | `maintenance-scans` | `.github/workflows/scan-*.yml` + `deslop.yml` + `hopper.yml` + `prompts/scans/` | Scheduled read-only scans (bugs, security, perf, coverage, dead code, types, docs, complexity, mutation, deps, a11y, groom) and a weekly de-slop code-quality audit, filing agent-ready issues so the Ralph backlog never starves or floods |
 | `dependabot-ralph-bridge` | `.github/workflows/dependabot-to-ralph-issue.yml` | Bridges Dependabot's PR-only model into the Ralph loop's issue-first picker |
-| `ralph-recap` | `scripts/ralph/recap.py` + `stats.py` + `ralph-recap*.yml` | Posts a Discord embed recap (merge rate, review iterations, backlog ETA) on every merge |
 | `quality-gate-scripts` | `scripts/backend/`, `scripts/frontend/`, `dev-setup.sh`, `pre-deploy-check.sh` | Starting-template lint/format/typecheck/security/test/coverage scripts for a Python backend + TypeScript frontend monorepo |
+
+For the Discord merge recap itself, use the **`discord-ralph-recap` skill** directly (`--skills discord-ralph-recap` in `distribute-skills`) rather than a bundle — it's already a self-contained skill.
 
 Every bundle ships with generic placeholders (a stack description in `.claude/agents/shared/house-rules.md`, example product areas in `.github/deslop-areas.json`) that a target project fills in with its own conventions — see each bundle's `Requires` notes.
 

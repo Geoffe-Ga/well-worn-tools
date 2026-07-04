@@ -16,7 +16,7 @@ This is meant to run from a GitHub Actions workflow keyed on
 `.github/workflows/ralph-recap.yml` — but it runs fine locally too:
 
     DISCORD_BOT_TOKEN=... RALPH_CHANNEL_ID=... GITHUB_TOKEN=... \
-        python scripts/ralph/recap.py --repo your-org/your-repo --dry-run
+        python .claude/skills/discord-ralph-recap/scripts/recap.py --repo your-org/your-repo --dry-run
 
 `--dry-run` prints the rendered embed as JSON instead of posting it.
 
@@ -67,7 +67,7 @@ DISCORD_API = "https://discord.com/api/v10"
 EMBED_COLOR = 0x7C3AED
 # Zero-width space — a non-empty Discord field value that renders as blank, used
 # to turn a field into a header-only line.
-BLANK = "​"
+BLANK = "\u200b"
 # Section headers. Discord can't size text, so uppercase flanked by four em-dashes
 # on each side is what makes these read as section breaks rather than another bold
 # field label. No emoji, no window qualifier — just the section name.
@@ -453,7 +453,7 @@ def build_recap(repo: str, *, token: str, max_prs: int, now: dt.datetime) -> dic
     day_ago = now - dt.timedelta(hours=stats.HOURS_PER_DAY)
     latest_churn = stats.churn_totals(churn[:1])
     loc_7d = stats.churn_totals(churn)
-    loc_24h = stats.churn_totals([c for c, ts in zip(churn, merged_at) if ts >= day_ago])
+    loc_24h = stats.churn_totals([c for c, ts in zip(churn, merged_at, strict=True) if ts >= day_ago])
     repo_net = fetch_repo_net_lines(repo, token=token)
 
     headline = generate_headline(str(latest.get("title", "")), str(latest.get("body") or ""))
