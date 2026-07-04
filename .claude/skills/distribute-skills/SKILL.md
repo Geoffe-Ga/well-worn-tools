@@ -130,6 +130,8 @@ Workflows have no `metadata.distribute` frontmatter, so distribution is governed
 
 | Name | File | Purpose | Required setup in target |
 |------|------|---------|--------------------------|
+| `claude-code-review` | `claude-code-review.yml` | PR review that always posts, in a fixed template, with a deterministic `## Verdict: LGTM\|CHANGES_REQUESTED\|COMMENTS` line — forces structured `{verdict, verdict_rationale, review_markdown}` output via `--json-schema` instead of hoping the model remembers to comment. What `address-feedback`/`await-claude-review`/`iteration-trigger` all parse. | Repo secret `CLAUDE_CODE_OAUTH_TOKEN`; optional `RALPH_BOT_PAT`; a `CLAUDE.md` at the repo root. |
+| `claude-mention` | `claude.yml` | The `@claude` mention-triggered assistant, gated to OWNER/MEMBER commenters so a public repo can't have its Claude runs triggered by arbitrary commenters. | Repo secret `CLAUDE_CODE_OAUTH_TOKEN`. |
 | `iteration-trigger` | `iteration-trigger.yml` | Posts a CI / Verdict / next-action summary comment as the repo owner whenever CI completes green and a Claude review exists, to wake a Claude Code mobile session via webhook. Capped at 10 self-posts per PR. | A workflow named `CI` (so `workflow_run` matches), repo secret `RALPH_BOT_PAT` with `pull-requests: write`, and an active Claude review workflow producing comments with a `Verdict` line. |
 
 Add a workflow to the allowlist when it's generic enough that most target repos would benefit and its dependencies can be stated up front in the PR body.
@@ -213,7 +215,22 @@ $ python .claude/skills/distribute-skills/scripts/distribute.py \
 
 The dry-run prints the planned commit; remove `--dry-run` once the PR plan looks right. The PR body lists the workflow's required secret (`RALPH_BOT_PAT`) and the dependency on a `CI` workflow as a checklist item for the maintainer.
 
-### Example 4: Refuse to Overwrite
+### Example 4: Upgrade a Repo's Claude Review to the Deterministic Version
+
+A target repo that already has *some* Claude PR-review workflow (e.g. the default plugin-based one) is exactly the "target already has the file" case — `distribute` refuses to overwrite it, so the maintainer replaces it by hand:
+
+```bash
+$ python .claude/skills/distribute-skills/scripts/distribute.py \
+      Geoffe-Ga/some-service \
+      --workflows claude-code-review claude-mention \
+      --branch upgrade-claude-review/$(date +%F) \
+      --dry-run
+ERROR: target already has .github/workflows/claude-code-review.yml — refuse to overwrite.
+```
+
+Have the maintainer delete (or rename) their existing `claude-code-review.yml` first, then re-run without `--dry-run`. The new one posts a fixed-template review and a deterministic `## Verdict:` line every time — the thing `address-feedback` and `await-claude-review` are built to parse — instead of whatever shape a plugin-based review happens to produce.
+
+### Example 5: Refuse to Overwrite
 
 ```bash
 $ python .claude/skills/distribute-skills/scripts/distribute.py \
