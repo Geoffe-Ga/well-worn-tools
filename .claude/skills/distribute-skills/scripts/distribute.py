@@ -60,6 +60,43 @@ GH_MISSING_HINT = (
 # source workflows dir, plus prose used in the PR body so the maintainer knows
 # what the workflow does and what setup it needs.
 DISTRIBUTABLE_WORKFLOWS: dict[str, dict[str, str]] = {
+    "claude-code-review": {
+        "filename": "claude-code-review.yml",
+        "summary": (
+            "PR-review workflow that always posts, always in the same shape, and "
+            "always ends with a machine-parseable verdict. Uses the action's "
+            "`--json-schema` flag to force a structured `{verdict, "
+            "verdict_rationale, review_markdown}` result — the review body "
+            "follows a fixed template (Summary / Strengths / Security Concerns / "
+            "Problems / Code Quality / CLAUDE.md Adherence / Testing / "
+            "Documentation) instead of whatever shape the model felt like that "
+            "run — and a deterministic 'Post review' step appends the exact "
+            "`## Verdict: LGTM|CHANGES_REQUESTED|COMMENTS` line and posts it "
+            "itself, so a review is never silently skipped (the classic failure "
+            "mode of letting the model remember to comment). This is what "
+            "`address-feedback`, `await-claude-review`, and `iteration-trigger` "
+            "all parse — replaces a repo's existing Claude PR-review workflow "
+            "with this one for consistent, automation-friendly verdicts."
+        ),
+        "requires": (
+            "(a) repo secret `CLAUDE_CODE_OAUTH_TOKEN`; "
+            "(b) optional repo secret `RALPH_BOT_PAT` (falls back to "
+            "`GITHUB_TOKEN`/github-actions[bot]) so the verdict comment posts "
+            "under a real account other automation (e.g. `iteration-trigger`) "
+            "can recognize; (c) a `CLAUDE.md` at the repo root — the review is "
+            "scored against it."
+        ),
+    },
+    "claude-mention": {
+        "filename": "claude.yml",
+        "summary": (
+            "The `@claude` mention-triggered assistant (issue/PR comments and "
+            "reviews), gated so only the repo OWNER or a MEMBER can invoke it — "
+            "without this gate, anyone who can comment on a public repo's issue "
+            "or PR can trigger a paid Claude run."
+        ),
+        "requires": ("repo secret `CLAUDE_CODE_OAUTH_TOKEN`."),
+    },
     "iteration-trigger": {
         "filename": "iteration-trigger.yml",
         "summary": (
