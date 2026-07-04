@@ -363,12 +363,12 @@ def _build_pr_body(
     if bundles:
         parts.extend(["## Scaffolding bundles", ""])
         for name in bundles:
-            spec = DISTRIBUTABLE_BUNDLES[name]
-            paths = spec["paths"]
+            bundle_spec = DISTRIBUTABLE_BUNDLES[name]
+            paths = bundle_spec["paths"]
             assert isinstance(paths, list)
-            parts.append(f"- **{name}** — {spec['summary']}")
+            parts.append(f"- **{name}** — {bundle_spec['summary']}")
             parts.append(f"  - **Adds:** {', '.join(f'`{p}`' for p in paths)}")
-            parts.append(f"  - **Requires:** {spec['requires']}")
+            parts.append(f"  - **Requires:** {bundle_spec['requires']}")
         parts.append("")
 
     parts.extend(
