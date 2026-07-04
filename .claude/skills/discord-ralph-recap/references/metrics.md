@@ -40,7 +40,7 @@ Per PR, `merged_at - created_at` in hours. The embed shows median (robust to one
 
 ## Backlog remaining and ETA
 
-`open_items` is the count of **open issues with the `pull_request` key absent** — open PRs are excluded so they don't inflate the backlog. ETA is `open_items / per_day`, expressed as days and an absolute date.
+`open_items` is the count of **open issues with the `pull_request` key absent** (open PRs are excluded so they don't inflate the backlog) **minus any issue bearing one of the Ralph picker's exclude labels** — epics, `blocked`, `needs-spec`, `do-not-auto-merge`, etc. — so the ETA reflects what `scripts/ralph/pick-next.sh` would actually pick up next, not every open card. The exclude set defaults to the same list as the picker and honors the same `RALPH_EXCLUDE_LABELS` env var; set it (space-separated) to override, or to an empty string to count every open issue. ETA is `open_items / per_day`, expressed as days and an absolute date.
 
 When `per_day` is zero (no merges in window), the ETA is reported as `unknown (stalled)` rather than infinity. When the backlog is empty, it reads `backlog clear`.
 

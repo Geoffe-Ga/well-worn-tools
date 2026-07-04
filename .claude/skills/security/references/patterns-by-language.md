@@ -63,7 +63,7 @@ def get_api_key(key_name: str) -> str:
         raise ValueError(f"API key '{key_name}' not found in OS keyring.")
     return api_key
 
-# WRONG: API_KEY = "sk-ant-1234567890"
+# WRONG: API_KEY = "sk-ant-1234567890"  # pragma: allowlist secret
 # WRONG: api_key = os.environ.get("API_KEY")
 # CORRECT: api_key = get_api_key("claude_api_key")
 ```

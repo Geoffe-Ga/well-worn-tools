@@ -1,13 +1,15 @@
 ---
 name: distribute-skills
 description: >-
-  Push well-worn-tools skills outward to every sibling GitHub repo owned
-  by the same user or org that does not already have them, opening one PR
-  per target. Use when the user says "distribute skills", "push my skills
-  to other repos", "share well-worn-tools across my projects", "open PRs
-  adding skills to <repo>", or "propagate my skills". Honors
+  Push well-worn-tools skills, workflows, and multi-directory scaffolding
+  bundles (e.g. the Ralph fleet loop, maintenance scans) outward to any
+  target GitHub repo, opening one PR per target. Use when the user says
+  "distribute skills", "push my skills to other repos", "share
+  well-worn-tools across my projects", "open PRs adding skills to <repo>",
+  "set up the Ralph loop in <repo>", or "propagate my skills". Honors
   metadata.distribute false in each skill's frontmatter to skip exempt
-  skills (collect-skills, distribute-skills, and any other opted out).
+  skills (collect-skills, distribute-skills, and any other opted out);
+  workflows and bundles are opt-in via explicit allowlists in distribute.py.
   Computes the missing-skill set per target, creates a feature branch
   with the new entries, commits with provenance, and opens a PR via
   Python helpers in scripts/. The agent reviews each per-repo plan before
@@ -104,6 +106,7 @@ python .claude/skills/distribute-skills/scripts/distribute.py \
     <owner>/<repo> \
     --skills <skill-1> <skill-2> ... \
     [--workflows iteration-trigger ...] \
+    [--bundles ralph-loop maintenance-scans ...] \
     --branch add-well-worn-skills/$(date +%F) \
     [--dry-run]
 ```
@@ -112,14 +115,14 @@ The script:
 
 1. Clones the target repo into a temporary directory at the default branch.
 2. Creates the feature branch.
-3. Copies each requested skill from this checkout into `.claude/skills/<skill-name>/` of the clone, refusing to overwrite if the target already has a directory by that name. If `--workflows` is set, also copies each named workflow YAML from `.github/workflows/` into the clone's `.github/workflows/`, with the same overwrite-refusal contract.
+3. Copies each requested skill from this checkout into `.claude/skills/<skill-name>/` of the clone, refusing to overwrite if the target already has a directory by that name. If `--workflows` is set, also copies each named workflow YAML from `.github/workflows/` into the clone's `.github/workflows/`, with the same overwrite-refusal contract. If `--bundles` is set, also copies each named bundle's repo-relative files/directories (e.g. `.claude/agents/`, `scripts/ralph/`) to the same relative paths in the clone, same overwrite-refusal contract.
 4. Commits with a message that names the source SHA in well-worn-tools.
 5. Pushes the branch.
-6. Opens a PR via `gh pr create` with a body that lists each skill, each workflow (with its dependency notes), and a link back to well-worn-tools.
+6. Opens a PR via `gh pr create` with a body that lists each skill, each workflow (with its dependency notes), each bundle (with the paths it adds and its dependency notes), and a link back to well-worn-tools.
 
 `--dry-run` does steps 1-4 without pushing or opening the PR. Use it on the first target as a sanity check.
 
-At least one of `--skills` or `--workflows` is required. Skills-only invocations are unchanged from before; workflows are an additive opt-in.
+At least one of `--skills`, `--workflows`, or `--bundles` is required. Skills-only invocations are unchanged from before; workflows and bundles are additive opt-ins.
 
 #### Distributable workflows
 
@@ -127,9 +130,22 @@ Workflows have no `metadata.distribute` frontmatter, so distribution is governed
 
 | Name | File | Purpose | Required setup in target |
 |------|------|---------|--------------------------|
-| `iteration-trigger` | `iteration-trigger.yml` | Posts a CI / Verdict / next-action summary comment as the repo owner whenever CI completes green and a Claude review exists, to wake a Claude Code mobile session via webhook. Capped at 10 self-posts per PR. | A workflow named `CI` (so `workflow_run` matches), repo secret `GEOFFE_GA_PAT` with `pull-requests: write`, and an active Claude review workflow producing comments with a `Verdict` line. |
+| `iteration-trigger` | `iteration-trigger.yml` | Posts a CI / Verdict / next-action summary comment as the repo owner whenever CI completes green and a Claude review exists, to wake a Claude Code mobile session via webhook. Capped at 10 self-posts per PR. | A workflow named `CI` (so `workflow_run` matches), repo secret `RALPH_BOT_PAT` with `pull-requests: write`, and an active Claude review workflow producing comments with a `Verdict` line. |
 
-Add a workflow to the allowlist when it's generic enough that every Geoffe-Ga repo would benefit and its dependencies can be stated up front in the PR body.
+Add a workflow to the allowlist when it's generic enough that most target repos would benefit and its dependencies can be stated up front in the PR body.
+
+#### Distributable bundles
+
+A **bundle** is a set of repo-relative paths (files or whole directories) that only work together — unlike a skill (one self-contained directory) or a workflow (one YAML file), these span multiple top-level directories (`.claude/agents/`, `scripts/ralph/`, `.github/workflows/`, `prompts/`) and would be a broken partial install if shipped piecemeal. Bundles have no frontmatter either, so distribution is governed by an explicit allowlist in `distribute.py` (`DISTRIBUTABLE_BUNDLES`). Currently:
+
+| Name | What it adds | Requires |
+|------|--------------|----------|
+| `ralph-loop` | `.claude/agents/` (chief-architect + specialist taxonomy + `ralph-worker`), `.claude/commands/ralph-tick.md`, `scripts/ralph/` fleet mechanics (`fleet.sh`, `pick-next.sh`, `pr-ready.sh`, `FLEET.md`, `PROMPT.md`, `state.json`, tests) | Fill in the stack/threshold placeholders in `shared/house-rules.md`; `scripts/<side>/check-all.sh` must exist (see `quality-gate-scripts`); `gh` CLI; the `stay-green`/`ci-debugging`/`address-feedback` skills |
+| `maintenance-scans` | The reusable scan core + all `scan-*.yml` wrappers, `deslop.yml`, `hopper.yml`, `labels-bootstrap.yml`, `.github/deslop-areas.json`, `prompts/scans/`, `prompts/templates/scan-issue-body.md`, `scripts/setup-scan-labels.sh` | The `scan-issue-writer` and `de-slopify` skills; secret `CLAUDE_CODE_OAUTH_TOKEN`; run `labels-bootstrap.yml` once after merge; edit `deslop-areas.json` for this project's real product areas |
+| `dependabot-ralph-bridge` | `.github/workflows/dependabot-to-ralph-issue.yml` | The `ralph-loop` bundle; secret `RALPH_BOT_PAT` recommended |
+| `quality-gate-scripts` | `scripts/backend/`, `scripts/frontend/`, `scripts/dev-setup.sh`, `scripts/pre-deploy-check.sh` | Adapt tool invocations to the target's actual stack — see `scripts/README.md` |
+
+Add a bundle to the allowlist when a piece of scaffolding is generic enough to help most target repos but spans more than one top-level directory, so `--skills`/`--workflows` can't express it alone. The Discord merge recap is deliberately **not** a bundle — it's a self-contained skill (`discord-ralph-recap`), so it ships via `--skills` instead.
 
 ### Step 7: Verify the PR Looks Right
 
@@ -195,7 +211,7 @@ $ python .claude/skills/distribute-skills/scripts/distribute.py \
       --dry-run
 ```
 
-The dry-run prints the planned commit; remove `--dry-run` once the PR plan looks right. The PR body lists the workflow's required secret (`GEOFFE_GA_PAT`) and the dependency on a `CI` workflow as a checklist item for the maintainer.
+The dry-run prints the planned commit; remove `--dry-run` once the PR plan looks right. The PR body lists the workflow's required secret (`RALPH_BOT_PAT`) and the dependency on a `CI` workflow as a checklist item for the maintainer.
 
 ### Example 4: Refuse to Overwrite
 
@@ -236,7 +252,7 @@ When `gh` and local `git push` are unavailable, drive the same workflow through 
 | 3. Targets | `discover.py targets <owner>` | `mcp__github__search_repositories` with query `user:<owner>` (or `org:<owner>`); filter archived, forks, and well-worn-tools in the agent. |
 | 4. Diff target | `check_target.py <owner>/<repo>` | `mcp__github__get_file_contents` on the target's `.claude/skills` path; intersect with the local list to compute missing names. |
 | 5. Plan | (agent builds in-context) | Same — pure context work. |
-| 6. Distribute | `distribute.py ... [--dry-run]` | (a) `mcp__github__create_branch` on the target. (b) Read each local skill's files with the `Read` tool, plus `.github/workflows/<file>.yml` for any selected workflow. (c) `mcp__github__push_files` once per target with all files for all selected skills and workflows, including a commit message that names the source SHA. (d) `mcp__github__create_pull_request` with title and body — include the workflow dependency checklist (PAT, `CI` workflow name) in the body. |
+| 6. Distribute | `distribute.py ... [--dry-run]` | (a) `mcp__github__create_branch` on the target. (b) Read each local skill's files with the `Read` tool, plus `.github/workflows/<file>.yml` for any selected workflow, plus every path listed in `DISTRIBUTABLE_BUNDLES[<name>]` (recursing into directories) for any selected bundle. (c) `mcp__github__push_files` once per target with all files for all selected skills, workflows, and bundles, including a commit message that names the source SHA. (d) `mcp__github__create_pull_request` with title and body — include the workflow/bundle dependency checklist (PAT, `CI` workflow name, required skills/secrets) in the body. |
 | 7. Verify | Open PR URL | Same — open the URL the MCP call returns. |
 
 The `--dry-run` semantics in cloud are: stop after step (b), report the file list and intended commit/PR text, and do not call `create_branch` or `push_files`. Implement this in the agent's plan, not in code.

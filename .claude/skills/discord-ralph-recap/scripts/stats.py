@@ -84,33 +84,42 @@ def _median(values: list[float]) -> float:
     return (ordered[mid - 1] + ordered[mid]) / 2
 
 
+HOURS_PER_DAY = 24.0
+DAYS_PER_WEEK = 7.0
+
+
 def merge_rate(merged_at: list[dt.datetime], *, now: dt.datetime) -> dict[str, float]:
-    """Compute merge throughput from a list of merge timestamps.
+    """Compute merge throughput over fixed rolling windows.
 
-    Returns merges-per-day over the whole campaign, merges over the trailing 7
-    days, and the span in days. The campaign span runs from the first merge to
-    `now` (not to the last merge) so a stalled loop shows a decaying rate rather
-    than a frozen one.
+    Reports activity over the trailing 24 hours (as merges-per-hour) and the
+    trailing 7 days (as merges-per-day). Fixed-width windows mean every recap
+    moves with the latest data instead of being diluted by a frozen all-time
+    span, and an idle loop decays toward zero rather than showing a stale
+    average. The 7-day per-day figure (steadier than the 24h one) is what the
+    backlog ETA is built on.
     """
-    count = len(merged_at)
-    if count == 0:
-        return {"total": 0.0, "per_day": 0.0, "last_7_days": 0.0, "span_days": 0.0}
+    if not merged_at:
+        return {"last_24h": 0.0, "per_hour": 0.0, "last_7_days": 0.0, "per_day": 0.0}
 
-    first = min(merged_at)
-    span_days = max((now - first).total_seconds() / 86400.0, 1e-9)
-    week_ago = now - dt.timedelta(days=7)
+    day_ago = now - dt.timedelta(hours=HOURS_PER_DAY)
+    week_ago = now - dt.timedelta(days=DAYS_PER_WEEK)
+    last_24h = sum(1 for ts in merged_at if ts >= day_ago)
     last_7 = sum(1 for ts in merged_at if ts >= week_ago)
 
     return {
-        "total": float(count),
-        "per_day": count / span_days,
+        "last_24h": float(last_24h),
+        "per_hour": last_24h / HOURS_PER_DAY,
         "last_7_days": float(last_7),
-        "span_days": span_days,
+        "per_day": last_7 / DAYS_PER_WEEK,
     }
 
 
 def time_to_merge_stats(durations_hours: list[float]) -> dict[str, float]:
-    """Summarize how long PRs sat open before merging, in hours."""
+    """Summarize a list of PR durations (hours) as mean/median/fastest/slowest.
+
+    Used for both the open-to-merge window and the merge-to-merge tick cadence —
+    it is just a five-number summary over whatever durations it is handed.
+    """
     if not durations_hours:
         return {"mean": 0.0, "median": 0.0, "fastest": 0.0, "slowest": 0.0}
     return {
@@ -119,6 +128,22 @@ def time_to_merge_stats(durations_hours: list[float]) -> dict[str, float]:
         "fastest": min(durations_hours),
         "slowest": max(durations_hours),
     }
+
+
+def merge_intervals_hours(merged_at: list[dt.datetime]) -> list[float]:
+    """Hours between each consecutive pair of merges — the per-tick cadence.
+
+    Sorts the merge timestamps ascending and returns the gap, in hours, between
+    each merge and the one before it (so n merges yield n-1 intervals; fewer than
+    two merges yield an empty list). For a sequential loop this is the closest
+    available proxy for how long each tick actually took end to end — pick, code,
+    review, merge — because a PR's own commit timestamps only mark when work was
+    committed, not when it began.
+    """
+    if len(merged_at) < 2:
+        return []
+    ordered = sorted(merged_at)
+    return [(ordered[i] - ordered[i - 1]).total_seconds() / 3600.0 for i in range(1, len(ordered))]
 
 
 def iteration_stats(per_pr: list[int]) -> dict[str, float]:
@@ -169,6 +194,16 @@ def churn_totals(churn: list[tuple[int, int, int]]) -> dict[str, int]:
         "net": additions - deletions,
         "files": files,
     }
+
+
+def net_lines_from_code_frequency(weeks: list[list[int]]) -> int:
+    """Sum GitHub's weekly code-frequency rows into the repo's net lines of code.
+
+    Each row is `[unix_week, additions, deletions]` and GitHub reports deletions
+    as a negative number, so the running net is just additions and deletions added
+    straight across every week. Returns 0 for an empty history.
+    """
+    return sum(int(week[1]) + int(week[2]) for week in weeks)
 
 
 def busiest_day(merged_at: list[dt.datetime]) -> tuple[str, int] | None:

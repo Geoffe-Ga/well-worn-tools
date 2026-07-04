@@ -11,13 +11,13 @@ class TestConfigurationManager:
     @pytest.fixture
     def valid_config_file(self, tmp_path: Path) -> Path:
         config = tmp_path / "config.json"
-        config.write_text('{"api_key": "abc123", "timeout": 30}')
+        config.write_text('{"api_key": "abc123", "timeout": 30}')  # pragma: allowlist secret
         return config
 
     def test_load_valid_config_returns_config_object(self, manager, valid_config_file):
         result = manager.load(valid_config_file)
         assert isinstance(result, Config)
-        assert result.api_key == "abc123"
+        assert result.api_key == "abc123"  # pragma: allowlist secret
         assert result.timeout == 30
 
     def test_load_missing_file_raises_file_not_found(self, manager, tmp_path):
@@ -39,9 +39,9 @@ class TestConfigurationManager:
 
     def test_reload_updates_configuration(self, manager, valid_config_file):
         manager.load(valid_config_file)
-        valid_config_file.write_text('{"api_key": "xyz789", "timeout": 60}')
+        valid_config_file.write_text('{"api_key": "xyz789", "timeout": 60}')  # pragma: allowlist secret
         manager.reload()
-        assert manager.current_config.api_key == "xyz789"
+        assert manager.current_config.api_key == "xyz789"  # pragma: allowlist secret
         assert manager.current_config.timeout == 60
 ```
 

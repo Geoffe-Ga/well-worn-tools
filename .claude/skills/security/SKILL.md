@@ -40,6 +40,13 @@ Key areas:
 - **XSS prevention**: Escape HTML output, use framework defaults
 - **Secret management**: Use OS keyring, never hardcode secrets
 - **CSRF protection**: Use tokens with constant-time comparison
+- **User-supplied API keys/credentials**: never store them server-side in
+  plaintext (client-side secure storage or an encrypted-at-rest store); pass
+  via a request header, never a URL or body; never log the value; clear from
+  memory after use
+- **Error responses**: never surface an internal exception's message or
+  traceback to the caller — log the detail server-side, return a generic
+  message (see Example 3)
 
 ### Step 3: Run the Security Checklist
 
@@ -81,6 +88,17 @@ subprocess.run(f"git clone {user_repo}", shell=True)
 
 # CORRECT - no injection possible
 subprocess.run(["git", "clone", user_repo], check=True)
+```
+
+### Example 3: Safe Error Response (any web framework)
+
+```python
+# WRONG - leaks internal details (stack trace, query, file paths) to the caller
+raise HTTPException(status_code=500, detail=str(exc))
+
+# CORRECT - log the detail server-side, return a generic message
+logger.exception("Unhandled error in endpoint X")
+raise HTTPException(status_code=500, detail="internal_error")
 ```
 
 ## Troubleshooting

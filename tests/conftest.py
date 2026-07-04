@@ -34,3 +34,10 @@ distribute = _load("ww_distribute", DISTRIBUTE_DIR / "distribute.py")
 distribute_discover = _load("ww_distribute_discover", DISTRIBUTE_DIR / "discover.py")
 collect_adapt = _load("ww_collect_adapt", COLLECT_DIR / "adapt.py")
 ralph_stats = _load("ww_ralph_stats", RALPH_RECAP_DIR / "stats.py")
+
+# recap.py does a bare `import stats` (a sibling-module import, since both
+# scripts live side by side in the skill's scripts/ dir) - put that directory
+# on sys.path first so the import resolves before loading recap.py itself.
+if str(RALPH_RECAP_DIR) not in sys.path:
+    sys.path.insert(0, str(RALPH_RECAP_DIR))
+ralph_recap = _load("ww_ralph_recap", RALPH_RECAP_DIR / "recap.py")

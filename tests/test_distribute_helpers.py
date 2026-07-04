@@ -109,37 +109,91 @@ def test_validate_workflows_clean_passes(tmp_path: Path) -> None:
     d._validate_workflows(source, ["iteration-trigger"], target)
 
 
+# ---------- _validate_bundles ----------
+
+
+def test_validate_bundles_unknown_name_raises(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit, match="unknown bundle"):
+        d._validate_bundles(tmp_path, ["does-not-exist"], tmp_path)
+
+
+def test_validate_bundles_missing_source_raises(tmp_path: Path) -> None:
+    source = tmp_path / "src"
+    source.mkdir()
+    target = tmp_path / "tgt"
+    with pytest.raises(SystemExit, match="source path not found"):
+        d._validate_bundles(source, ["quality-gate-scripts"], target)
+
+
+def test_validate_bundles_existing_target_raises(tmp_path: Path) -> None:
+    source = tmp_path / "src"
+    (source / "scripts" / "backend").mkdir(parents=True)
+    (source / "scripts" / "frontend").mkdir(parents=True)
+    (source / "scripts" / "dev-setup.sh").write_text("#!/bin/sh\n")
+    (source / "scripts" / "pre-deploy-check.sh").write_text("#!/bin/sh\n")
+    target = tmp_path / "tgt"
+    (target / "scripts" / "backend").mkdir(parents=True)
+    with pytest.raises(SystemExit, match="refuse to overwrite"):
+        d._validate_bundles(source, ["quality-gate-scripts"], target)
+
+
+def test_validate_bundles_clean_passes(tmp_path: Path) -> None:
+    source = tmp_path / "src"
+    (source / "scripts" / "backend").mkdir(parents=True)
+    (source / "scripts" / "frontend").mkdir(parents=True)
+    (source / "scripts" / "dev-setup.sh").write_text("#!/bin/sh\n")
+    (source / "scripts" / "pre-deploy-check.sh").write_text("#!/bin/sh\n")
+    target = tmp_path / "tgt"
+    d._validate_bundles(source, ["quality-gate-scripts"], target)  # must not raise
+
+
 # ---------- _build_pr_title ----------
 
 
 def test_pr_title_skills_only() -> None:
-    assert d._build_pr_title(["security"], []) == "Add security from well-worn-tools"
+    assert d._build_pr_title(["security"], [], []) == "Add security from well-worn-tools"
 
 
 def test_pr_title_workflows_only() -> None:
-    assert d._build_pr_title([], ["iteration-trigger"]) == ("Add iteration-trigger workflow(s) from well-worn-tools")
+    assert d._build_pr_title([], ["iteration-trigger"], []) == (
+        "Add iteration-trigger workflow(s) from well-worn-tools"
+    )
+
+
+def test_pr_title_bundles_only() -> None:
+    assert d._build_pr_title([], [], ["quality-gate-scripts"]) == (
+        "Add quality-gate-scripts bundle(s) from well-worn-tools"
+    )
 
 
 def test_pr_title_combined() -> None:
-    assert d._build_pr_title(["security"], ["iteration-trigger"]) == "Add skills and workflows from well-worn-tools"
+    assert (
+        d._build_pr_title(["security"], ["iteration-trigger"], [])
+        == "Add skills, workflows, and/or bundles from well-worn-tools"
+    )
 
 
 # ---------- _build_commit_message ----------
 
 
 def test_commit_message_skills_only() -> None:
-    msg = d._build_commit_message(["security", "testing"], [], "abc1234")
+    msg = d._build_commit_message(["security", "testing"], [], [], "abc1234")
     assert msg.startswith("feat: Add skills security, testing from well-worn-tools")
     assert "abc1234" in msg
 
 
 def test_commit_message_workflows_only() -> None:
-    msg = d._build_commit_message([], ["iteration-trigger"], "abc1234")
+    msg = d._build_commit_message([], ["iteration-trigger"], [], "abc1234")
     assert msg.startswith("feat: Add workflows iteration-trigger from well-worn-tools")
 
 
+def test_commit_message_bundles_only() -> None:
+    msg = d._build_commit_message([], [], ["quality-gate-scripts"], "abc1234")
+    assert msg.startswith("feat: Add bundles quality-gate-scripts from well-worn-tools")
+
+
 def test_commit_message_combined() -> None:
-    msg = d._build_commit_message(["security"], ["iteration-trigger"], "abc1234")
+    msg = d._build_commit_message(["security"], ["iteration-trigger"], [], "abc1234")
     assert "skills security and workflows iteration-trigger" in msg
 
 
@@ -150,11 +204,12 @@ def test_pr_body_includes_workflow_requirements(tmp_path: Path) -> None:
     body = d._build_pr_body(
         skills=[],
         workflows=["iteration-trigger"],
+        bundles=[],
         source_skills_dir=tmp_path,
         source_sha="0" * 40,
     )
     assert "## Workflows" in body
-    assert "GEOFFE_GA_PAT" in body  # secret name surfaced
+    assert "RALPH_BOT_PAT" in body  # secret name surfaced
     assert "## Skills" not in body  # no skills section when none requested
     assert "actionlint" in body  # workflow-specific test plan items
 
@@ -168,6 +223,7 @@ def test_pr_body_includes_skill_descriptions(tmp_path: Path) -> None:
     body = d._build_pr_body(
         skills=["demo"],
         workflows=[],
+        bundles=[],
         source_skills_dir=tmp_path,
         source_sha="0" * 40,
     )
@@ -175,6 +231,20 @@ def test_pr_body_includes_skill_descriptions(tmp_path: Path) -> None:
     assert "demo" in body
     assert "A demo skill for tests" in body
     assert "## Workflows" not in body
+
+
+def test_pr_body_includes_bundle_paths(tmp_path: Path) -> None:
+    body = d._build_pr_body(
+        skills=[],
+        workflows=[],
+        bundles=["quality-gate-scripts"],
+        source_skills_dir=tmp_path,
+        source_sha="0" * 40,
+    )
+    assert "## Scaffolding bundles" in body
+    assert "quality-gate-scripts" in body
+    assert "scripts/backend" in body
+    assert "scripts/README.md" in body  # requires text points at the adaptation notes
 
 
 def test_pr_body_combined_has_both_sections(tmp_path: Path) -> None:
@@ -186,6 +256,7 @@ def test_pr_body_combined_has_both_sections(tmp_path: Path) -> None:
     body = d._build_pr_body(
         skills=["demo"],
         workflows=["iteration-trigger"],
+        bundles=[],
         source_skills_dir=tmp_path,
         source_sha="0" * 40,
     )
