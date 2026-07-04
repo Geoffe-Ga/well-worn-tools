@@ -1,9 +1,9 @@
 ---
 name: bug-squashing-methodology
 description: >-
-  Structured 5-step bug fix process with root cause analysis and TDD.
-  Use when fixing bugs, debugging failures, or investigating defects.
-  Covers RCA documentation, reproduction, TDD fix cycle, and PR workflow.
+  Structured 6-step bug fix process with reproduction, root cause analysis,
+  and TDD. Use when fixing bugs, debugging failures, or investigating defects.
+  Covers reproduction, RCA documentation, TDD fix cycle, and PR workflow.
   Do NOT use for general feature development (use stay-green), CI
   environment issues (use ci-debugging), code reviews (use
   comprehensive-pr-review), or general git workflow like issue creation,
@@ -19,7 +19,14 @@ Systematic process for fixing bugs: Document, Understand, Fix, Verify. Never ski
 
 ## Instructions
 
-### Step 1: Root Cause Analysis (RCA)
+### Step 1: Reproduce First
+
+Before writing anything down, reproduce the bug with a failing test or a
+direct repro command — capture the exact error message, stack trace, and
+input. An RCA written from a bug report's prose (not a real reproduction) is
+guesswork; the reproduction is what makes every later step trustworthy.
+
+### Step 2: Root Cause Analysis (RCA)
 
 Create `RCA_ISSUE_XXX.md` with:
 - **Problem Statement**: Error message, reproduction steps
@@ -30,7 +37,7 @@ Create `RCA_ISSUE_XXX.md` with:
 - **Fix Strategy**: Options with recommendation
 - **Prevention**: How to avoid similar bugs
 
-### Step 2: File a GitHub Issue
+### Step 3: File a GitHub Issue
 
 ```bash
 gh issue create --title "bug(component): Brief description" \
@@ -38,7 +45,7 @@ gh issue create --title "bug(component): Brief description" \
   --label "bug"
 ```
 
-### Step 3: Branch and Fix with TDD
+### Step 4: Branch and Fix with TDD
 
 ```bash
 git checkout -b fix-component-issue-XXX
@@ -48,7 +55,7 @@ git checkout -b fix-component-issue-XXX
 2. **Green**: Write minimal code to fix the bug (test passes)
 3. **Refactor**: Clean up the fix while keeping tests green
 
-### Step 4: Quality Gates
+### Step 5: Quality Gates
 
 Run both gates before committing:
 
@@ -60,7 +67,7 @@ Run both gates before committing:
 pre-commit run --all-files
 ```
 
-### Step 5: Commit and PR
+### Step 6: Commit and PR
 
 Use conventional commit format: `fix(component): brief description (#XXX)`
 

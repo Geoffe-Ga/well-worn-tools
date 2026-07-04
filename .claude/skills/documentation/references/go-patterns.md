@@ -18,7 +18,7 @@
 //
 // Environment Overrides
 //
-//	export APP_API_KEY="override-key"
+//	export APP_API_KEY="override-key"  // pragma: allowlist secret
 //
 // See examples/ directory for complete usage examples.
 package config

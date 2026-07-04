@@ -6,7 +6,7 @@
 ```python
 @pytest.fixture
 def sample_config() -> dict[str, str]:
-    return {"api_key": "test_key_123", "base_url": "https://api.example.com", "timeout": "30"}
+    return {"api_key": "test_key_123", "base_url": "https://api.example.com", "timeout": "30"}  # pragma: allowlist secret
 
 @pytest.fixture
 def config_file(tmp_path: Path, sample_config: dict) -> Path:
@@ -66,9 +66,9 @@ describe('ConfigLoader', () => {
   beforeEach(() => { loader = new ConfigLoader(); });
 
   it('should load valid configuration', async () => {
-    jest.spyOn(fs.promises, 'readFile').mockResolvedValue(JSON.stringify({ apiKey: 'test' }));
+    jest.spyOn(fs.promises, 'readFile').mockResolvedValue(JSON.stringify({ apiKey: 'test' }));  // pragma: allowlist secret
     const result = await loader.load('/tmp/config.json');
-    expect(result).toEqual({ apiKey: 'test' });
+    expect(result).toEqual({ apiKey: 'test' });  // pragma: allowlist secret
   });
 
   it.each([
@@ -110,7 +110,7 @@ func TestValidateConfig(t *testing.T) {
         config  Config
         wantErr bool
     }{
-        {"valid", Config{APIKey: "key", Timeout: 30}, false},
+        {"valid", Config{APIKey: "key", Timeout: 30}, false},  // pragma: allowlist secret
         {"missing key", Config{Timeout: 30}, true},
     }
     for _, tt := range tests {
@@ -146,7 +146,7 @@ mod tests {
 
     #[test]
     fn test_parse_valid_config() {
-        let json = r#"{"api_key": "test123", "timeout": 30}"#;
+        let json = r#"{"api_key": "test123", "timeout": 30}"#;  // pragma: allowlist secret
         let result = parse_config(json);
         assert!(result.is_ok());
         let config = result.unwrap();

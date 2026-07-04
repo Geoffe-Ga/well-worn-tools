@@ -83,7 +83,7 @@ function validateRegistration(data: unknown): ValidationResult {
   if (typeof email !== 'string' || !email.includes('@')) {
     errors.push('Invalid email format');
   }
-  if (typeof password !== 'string' || password.length < 8) {
+  if (typeof password !== 'string' || password.length < 8) {  // pragma: allowlist secret
     errors.push('Password must be at least 8 characters');
   }
   if (typeof username !== 'string' || username.length < 3) {

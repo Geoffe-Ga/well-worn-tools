@@ -11,12 +11,15 @@ description: >-
   verdict comment itself is a comment event, so the bot's post wakes
   the session directly — no need to proxy through CI status. After
   subscribing, end the turn; events resume the session.
+
   Called by `address-feedback`, `stay-green`, and
   `comprehensive-pr-review`.
+
   Do NOT use for waiting on arbitrary CI success (not deliverable by
   the webhook), general PR babysitting unrelated to the verdict gate,
   debugging CI failures themselves (use `ci-debugging`), or one-off
   status polling (use `pull_request_read` directly).
+
 metadata:
   author: Geoff
   version: 1.0.0
@@ -34,14 +37,14 @@ Wait for the Claude reviewer's `Verdict:` comment on the current HEAD via PR web
 
 So the deliverable set is:
 
-| Event                                         | Delivered? | Notes                                                          |
+| Event | Delivered? | Notes |
 | --------------------------------------------- | ---------- | -------------------------------------------------------------- |
-| Top-level PR comment (incl. reviewer verdict) | Yes        | This is the wake signal you want.                              |
-| Line-level review comment / thread reply      | Yes        | Treated as a comment event.                                    |
-| CI **failure** (any required check failing)   | Yes        | Triage on receipt — may indicate the reviewer action failed.   |
-| CI **success / pass**                         | **No**     | Do not write logic that waits on this — it never arrives.      |
-| Successful workflow_run completion            | **No**     | Same as above.                                                 |
-| PR merge / close                              | Implicit   | You should `unsubscribe_pr_activity` on these from the caller. |
+| Top-level PR comment (incl. reviewer verdict) | Yes | This is the wake signal you want. |
+| Line-level review comment / thread reply | Yes | Treated as a comment event. |
+| CI **failure** (any required check failing) | Yes | Triage on receipt — may indicate the reviewer action failed. |
+| CI **success / pass** | **No** | Do not write logic that waits on this — it never arrives. |
+| Successful workflow_run completion | **No** | Same as above. |
+| PR merge / close | Implicit | You should `unsubscribe_pr_activity` on these from the caller. |
 
 **Implication.** Don't treat "CI green" as a proxy for "review posted." The verdict comment is itself a delivered event — wait for it directly.
 
@@ -50,8 +53,10 @@ So the deliverable set is:
 The reviewer (see `comprehensive-pr-review`) ends its top-level comment with a line matching, case-insensitive:
 
 ```
-^\s*(?:##\s+|\*\*)?Verdict[:\*\s]+(LGTM|CHANGES_REQUESTED|COMMENTS)
+^\s*(?:##\s+|\*\*)?Verdict[:*\s]+(LGTM|CHANGES_REQUESTED|COMMENTS)
 ```
+
+`comprehensive-pr-review` is the canonical source for this format; this skill is the parser side of that contract.
 
 Examples that match:
 
@@ -68,25 +73,31 @@ If the regex does not match, treat the comment as malformed: do **not** infer a 
 Before subscribing, record what "current" means so you can later distinguish a fresh verdict from a stale one.
 
 1. `mcp__github__pull_request_read` with `method: "get"` → record `head.sha`.
-2. `mcp__github__get_commit` with `sha: head.sha` → record `commit.committer.date` as `headPushedAt` (proxy for the latest push time).
+2. `mcp__github__get_commit` with `sha: head.sha` → record `commit.committer.date` as `headPushedAt` (proxy for the latest push time). Note: `committer.date` does not change under a no-op force-push of the same SHA, so prior verdicts on that exact commit remain "current" by this check — acceptable in practice but worth knowing.
 
-### Step 2: Subscribe and End the Turn
+### Step 2: Subscribe, Set the Fallback Expectation, and End the Turn
 
 ```
 mcp__github__subscribe_pr_activity
-  owner: <owner>
-  repo:  <repo>
-  pullNumber: <N>
+owner: <owner>
+repo: <repo>
+pullNumber: <N>
 ```
 
 Then **stop**. Do not poll. Do not `sleep`. Do not call `pull_request_read get_comments` in a loop. Webhook events arrive as `<github-webhook-activity>` messages and resume the session on their own.
+
+**Wake delivery is best-effort, not guaranteed.** Some environments suppress comment-event wakes whose author identity overlaps with the session's own identity (e.g., a session running as Claude Code on web may not receive wake events for comments authored by `claude[bot]`, even though the comment exists on GitHub). The webhook delivery system is fire-and-forget — there is no retry queue and no backfill. To stay recoverable:
+
+1. End the turn with a one-sentence note to the user: "If I don't wake within ~5 minutes after the reviewer Action completes, prompt me to check status."
+2. On manual re-engagement, **immediately re-run Step 4** (re-fetch comments + currency check + parse). Do not re-subscribe and wait again — that won't backfill the missed event.
+3. Treat repeated wake failures in the same environment as a stable property of that environment, not a transient bug to retry against. Document the actual deliverable behavior for that workspace alongside this skill if needed.
 
 ### Step 3: On Wake — Classify the Event
 
 When a `<github-webhook-activity>` message arrives, decide what kind of event it is:
 
 - **Top-level PR comment from a reviewer bot** (`claude[bot]`, `github-actions[bot]`, or whichever account posts reviews on this repo) → go to Step 4.
-- **Line-level review comment** → not a verdict; if you're tracking thread resolutions for `address-feedback`, handle there. Otherwise stay subscribed and wait for the next event.
+- **Line-level review comment** → not a verdict. If `address-feedback` is the caller, log it in that skill's triage table for the current pass; otherwise stay subscribed and wait for the next event.
 - **CI failure event** → go to Step 5.
 - **Anything else** → stay subscribed; wait for the next event.
 
@@ -95,14 +106,15 @@ When a `<github-webhook-activity>` message arrives, decide what kind of event it
 Re-fetch the comments to read the full body (the webhook payload may be truncated):
 
 1. `mcp__github__pull_request_read` with `method: "get_comments"`.
-2. Filter to bot author + body containing the verdict regex.
-3. Sort by `created_at` desc; take the first.
-4. **Currency check**: require `created_at >= headPushedAt`. A verdict posted before the latest push describes an earlier state; ignore and keep waiting.
-5. Parse with the regex above. Return one of:
-   - `LGTM` → caller proceeds to merge gate.
-   - `CHANGES_REQUESTED` → caller enters fix loop.
-   - `COMMENTS` → caller decides (usually mergeable as-is).
-   - **Malformed** → surface to user; do not guess.
+2. **Verify `author.login` matches the configured reviewer bot** (`claude[bot]`, `github-actions[bot]`, or whichever account the repo uses) — this is mandatory, not optional. The verdict regex alone is not a sufficient guard; any commenter can write a line that matches it.
+3. Filter to bot author + body containing the verdict regex.
+4. Sort by `created_at` desc; take the first.
+5. **Currency check**: require `created_at >= headPushedAt`. A verdict posted before the latest push describes an earlier state; ignore and keep waiting.
+6. Parse with the regex above. Return one of:
+- `LGTM` → caller proceeds to merge gate.
+- `CHANGES_REQUESTED` → caller enters fix loop.
+- `COMMENTS` → caller decides (usually mergeable as-is).
+- **Malformed** → surface to user; do not guess.
 
 ### Step 5: On CI Failure for Current HEAD
 
@@ -173,3 +185,16 @@ Match by author login (`claude[bot]`, `github-actions[bot]`) AND require the bod
 ### Error: PR merged or closed while waiting
 
 The caller should detect this and call `unsubscribe_pr_activity`. If you see no further events for a long time, ask the user before assuming the PR is still open.
+
+### Error: Subscription confirmed, verdict was posted, but the session never woke
+
+Confirmed real, observed in environments where the session and the reviewer share a bot identity (e.g., Claude Code on web subscribed to a PR where `claude[bot]` posts the verdict). Symptoms: `subscribe_pr_activity` returned success, the reviewer Action completed and posted a verdict comment, the comment is visible via `get_comments`, but no `<github-webhook-activity>` arrived in this conversation.
+
+What to do:
+
+1. On manual re-engagement, **do not re-subscribe and wait again** — the webhook system is fire-and-forget; there is no backfill. Re-subscribing won't replay the missed event.
+2. Run Step 4 directly: `get_comments`, author-login check, currency check, parse the verdict. Proceed to the caller's next step (merge gate, fix loop, etc.) based on the verdict.
+3. If this failure mode is reproducible in your environment, when calling this skill again, end the turn with an explicit fallback prompt to the user (Step 2 of Instructions) so they know to re-engage you after a reasonable wait.
+4. Do **not** retry by re-subscribing in a loop. Repeated subscriptions in this failure mode produce repeated silence, not retries.
+
+This is a delivery-layer property of the environment, not a bug in this skill.
