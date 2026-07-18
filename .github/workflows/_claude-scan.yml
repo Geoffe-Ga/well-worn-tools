@@ -110,7 +110,7 @@ jobs:
           cd frontend && npm ci
 
       - name: Run Claude scan
-        uses: anthropics/claude-code-action@521136812280ae7ef256e06045655b9da02793f0  # v1.0.158
+        uses: anthropics/claude-code-action@3553f84341b92da26052e28acf1aa898f9511f32  # v1.0.177
         env:
           # The scan-issue-writer skill files issues via gh; the action injects
           # GITHUB_TOKEN, but gh reads GH_TOKEN — bind it to the job token whose
