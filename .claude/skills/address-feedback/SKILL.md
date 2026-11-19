@@ -9,19 +9,21 @@ description: >-
   NOT a formal GitHub approval. This skill finds the latest trusted verdict
   for the current HEAD and routes it: `CHANGES_REQUESTED` → TDD fix loop
   until LGTM; `COMMENTS` → never iterate, file each actionable item as a
-  P0–P3 follow-up issue, then squash-merge; `LGTM` → merge on green CI.
+  P0–P3 follow-up issue, then merge; `LGTM` → merge. Once every gate
+  passes, the merge is handed to GitHub by turning on auto-merge (squash),
+  or done directly when GitHub has nothing left to wait for.
   Do NOT use for giving a review (use comprehensive-pr-review), debugging CI
   failures themselves (use ci-debugging), general TDD work outside review
   context (use stay-green), bug RCA (use bug-squashing-methodology), or
   issue/branch/PR creation (use git-workflow).
 metadata:
   author: Geoff
-  version: 2.0.0
+  version: 2.1.0
 ---
 
 # Address Feedback
 
-Close the loop on a Claude PR review: find the latest trusted verdict comment for the current HEAD, then route it. `CHANGES_REQUESTED` → iterate locally with TDD and push once. `COMMENTS` → file a severity-prioritized follow-up issue for each actionable item (never iterate), then squash-merge. `LGTM` → merge. Every merge also requires green CI.
+Close the loop on a Claude PR review: find the latest trusted verdict comment for the current HEAD, then route it. `CHANGES_REQUESTED` → iterate locally with TDD and push once. `COMMENTS` → file a severity-prioritized follow-up issue for each actionable item (never iterate), then merge. `LGTM` → merge. Every merge also requires CI with no failures. Once every gate passes, the default last step is to turn on GitHub auto-merge (squash) so GitHub merges the moment its own required checks pass.
 
 ## How the Claude Review Surfaces
 
@@ -180,7 +182,7 @@ Merge only when **every** condition is true. If any fails, stop and explain whic
 
 - The latest qualifying review comment (allowlisted author, attested if the repo uses a marker, unedited by anyone else — Step 1) has `Verdict: LGTM`, **or** `Verdict: COMMENTS` with every actionable item filed, duplicate-linked, or moratorium-deferred per Step 1A.
 - That comment's `created_at >= head commit's committer.date` (verdict is for the current HEAD, not a pre-push state).
-- All required check runs are `success`:
+- No check run has failed (`failure`, `cancelled`, `timed_out`, `action_required`), and every check is `success` unless GitHub itself is holding the merge on it (`mergeable_state: blocked`, see "Then turn on auto-merge" below):
   - `mcp__github__pull_request_read` with `method: "get_status"` (combined commit status), and
   - `mcp__github__pull_request_read` with `method: "get_check_runs"` (per-job detail).
 - No unresolved line-level review threads (`mcp__github__pull_request_read` with `method: "get_review_comments"` — each thread has `isResolved`). For a `COMMENTS` verdict, threads are resolved by linking the follow-up issue or by the moratorium-deferral reply (Step 1A), not by code change.
@@ -191,17 +193,29 @@ Merge only when **every** condition is true. If any fails, stop and explain whic
 - The PR carries no human-hold label (for example `do-not-auto-merge`). That label is the one control a human keeps over an autonomous merge; nothing in this skill may route around it.
 - If the repo ships a readiness script (for example `scripts/ralph/pr-ready.sh`), it agrees that the PR is ready. If it disagrees, stop and surface the disagreement rather than overriding it.
 
-Then squash-merge:
+### Then Turn On Auto-Merge (the Default)
 
-```
-mcp__github__merge_pull_request
-  pull_number: <N>
-  merge_method: "squash"
-```
+Once every gate above holds, hand the merge to GitHub. Re-fetch the PR (`pull_request_read get`) and route on `mergeable_state`:
+
+| `mergeable_state` | Action |
+|---|---|
+| `blocked` | GitHub is holding the PR on its own requirements (required checks still running, a required approval). **Turn on auto-merge.** GitHub merges the moment those pass. |
+| `clean` or `behind` | Nothing is left to wait for, and GitHub refuses auto-merge on a clean PR. Squash-merge directly with `mcp__github__merge_pull_request` (`merge_method: "squash"`). |
+| `unstable` | A check that is not required is pending or failing. Auto-merge would not wait for it, so do neither: wait for it to finish, then re-enter this gate. |
+
+Turn auto-merge on with the first route that works, always with the squash method:
+
+1. `mcp__github__enable_pr_auto_merge` with `owner`, `repo`, `pullNumber: <N>`, `mergeMethod: "SQUASH"`.
+2. Claude Code cloud session without that tool (GraphQL is blocked there): `gh api -X PUT repos/<owner>/<repo>/pulls/<N>/ccr/auto_merge -f merge_method=squash`.
+3. Local session: `gh pr merge <N> --auto --squash`. Only in the `blocked` state, because on a clean PR `gh` merges at once.
+
+Then re-fetch the PR and confirm `auto_merge` is set (or the PR already merged). Report that auto-merge is on and what GitHub is still waiting for; never report "merged" until it has. If the repo does not allow auto-merge (the call says it is disabled for the repository), tell the user, do not change the repo setting yourself, and fall back to waiting for every check to pass and squash-merging directly.
 
 `squash` is required for the `COMMENTS` path so the follow-up issues are the only outstanding trail. For `LGTM`, use `squash` unless the repo standard says otherwise.
 
-Confirm the merge succeeded; do not delete the remote branch unless the user asks.
+**Auto-merge must not outlive the gates that earned it.** GitHub keeps auto-merge on through later pushes from accounts with write access, and it does not read labels. So turn it off (`mcp__github__disable_pr_auto_merge`, `gh api -X DELETE repos/<owner>/<repo>/pulls/<N>/ccr/auto_merge`, or `gh pr merge <N> --disable-auto`) **before** any further push to the PR, when a `CHANGES_REQUESTED` verdict arrives, or when a human-hold label appears. Turn it back on only after every gate passes again for the new HEAD.
+
+Do not delete the remote branch unless the user asks.
 
 ## Examples
 
@@ -211,7 +225,13 @@ Confirm the merge succeeded; do not delete the remote branch unless the user ask
 2. `pull_request_read get_comments` → latest comment by allowlisted author `github-actions[bot]` at `2026-05-01T10:04:33Z`, carrying this PR's marker, no edits by others, body ends with `## Verdict: LGTM`.
 3. `10:04:33Z >= 10:00:00Z` → comment is current.
 4. `get_status` and `get_check_runs` → all `success`. `get_review_comments` → no unresolved threads. PR `mergeable: true`, `mergeable_state: behind`, `draft: false` — behind is not a blocker.
-5. `merge_pull_request` with `squash`. Report merge URL.
+5. Nothing is pending, so auto-merge has nothing to wait for: `merge_pull_request` with `squash`. Report merge URL.
+
+### Example 1b: Current `Verdict: LGTM`, Required Checks Still Running — Turn On Auto-Merge
+
+1. Same as Example 1, but `get_check_runs` shows two required jobs `in_progress` and none failed. `mergeable_state: blocked`.
+2. `enable_pr_auto_merge` with `mergeMethod: "SQUASH"`. Re-fetch: `auto_merge` is set.
+3. Report "auto-merge is on; GitHub merges once the two running checks pass." Stay subscribed until the PR merges or closes.
 
 ### Example 2: Verdict Comment Predates the Latest Push (Stale)
 
@@ -236,7 +256,7 @@ Confirm the merge succeeded; do not delete the remote branch unless the user ask
    - `#143 Tighten error message in parser.py:142` — `P3`, `tech-debt`, `agent-ready`.
    - `#144 Add boundary test for empty input` — `P2` (missing test on a real path), `tech-debt`, `agent-ready`.
 4. Resolve the line-level threads with replies linking each issue. Post `Follow-ups filed: #142 (P1), #143 (P3), #144 (P2)` on the Claude comment, and name the `P1` to the user.
-5. Step 6 gate: `09:06:12Z >= 09:00:00Z` ✓, all checks `success` ✓, no unresolved threads ✓, no hold label ✓, `mergeable: true`, `draft: false`. Squash-merge `#137`.
+5. Step 6 gate: `09:06:12Z >= 09:00:00Z` ✓, no failed checks ✓, no unresolved threads ✓, no hold label ✓, `mergeable: true`, `draft: false`. Turn on auto-merge for `#137` (or squash-merge directly if `mergeable_state` is `clean`).
 
 ### Example 5: An LGTM That Was Edited by Someone Else
 
@@ -273,3 +293,9 @@ Stop. Reproduce the check locally first (pre-commit, full test suite, typecheck)
 ### Error: Merge gate passes but `mergeable` is `false`
 
 Conflicts with the base branch (`mergeable_state: dirty`). Rebase or merge the base locally, resolve, re-run local gates, push. The new commit supersedes the verdict — wait for a fresh review before re-entering the merge gate. If `mergeable_state` is merely `behind`, there is no conflict: merge without syncing.
+
+### Error: Auto-merge will not turn on
+
+- "Pull request is in clean status": nothing is pending, so squash-merge directly.
+- "Auto-merge is not allowed for this repository": the repo's **Allow auto-merge** setting is off. Tell the user; do not change it yourself. Fall back to waiting for green checks and merging directly.
+- The PR is `unstable`: a non-required check is pending or failing. Auto-merge would ignore it, so wait for it instead.
