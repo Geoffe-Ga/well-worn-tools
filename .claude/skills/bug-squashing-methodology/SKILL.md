@@ -4,13 +4,14 @@ description: >-
   Structured 6-step bug fix process with reproduction, root cause analysis,
   and TDD. Use when fixing bugs, debugging failures, or investigating defects.
   Covers reproduction, RCA documentation, TDD fix cycle, and PR workflow.
-  Do NOT use for general feature development (use stay-green), CI
-  environment issues (use ci-debugging), code reviews (use
-  comprehensive-pr-review), or general git workflow like issue creation,
-  branching, and PRs (use git-workflow).
+  Do NOT use for filing a new bug report as an issue (use flare), general
+  feature development (use stay-green), CI environment issues (use
+  ci-debugging), giving code reviews (use comprehensive-pr-review),
+  addressing review feedback (use address-feedback), or general git
+  workflow like branching and PRs (use git-workflow).
 metadata:
   author: Geoff
-  version: 1.0.0
+  version: 1.1.0
 ---
 
 # Bug Squashing Methodology
@@ -26,6 +27,13 @@ direct repro command — capture the exact error message, stack trace, and
 input. An RCA written from a bug report's prose (not a real reproduction) is
 guesswork; the reproduction is what makes every later step trustworthy.
 
+Run the narrowest reproduction you can (a single test, e.g.
+`pytest path::test_name -x -v` or `jest file -t "name"`). If no test exists
+yet, write one that reproduces the bug before fixing anything. When the
+failure is a validation error (e.g. an HTTP 422), capture the full response
+body — it names the field at fault. When it involves mocks or fixtures,
+check that they override the right dependencies and reset shared state.
+
 ### Step 2: Root Cause Analysis (RCA)
 
 Create `RCA_ISSUE_XXX.md` with:
@@ -37,7 +45,10 @@ Create `RCA_ISSUE_XXX.md` with:
 - **Fix Strategy**: Options with recommendation
 - **Prevention**: How to avoid similar bugs
 
-### Step 3: File a GitHub Issue
+### Step 3: File a GitHub Issue (if none exists)
+
+If the bug isn't tracked yet, file it (the flare skill does this end to end
+when available). If an issue already exists, add the RCA summary to it.
 
 ```bash
 gh issue create --title "bug(component): Brief description" \
@@ -63,8 +74,9 @@ Run both gates before committing:
 # Gate 1: All tests pass
 ./scripts/test.sh --all
 
-# Gate 2: All quality checks pass
-pre-commit run --all-files
+# Gate 2: All quality checks pass (the stay-green skill's Gate 2;
+# use pre-commit run --all-files where the repo has no check-all.sh)
+./scripts/check-all.sh
 ```
 
 ### Step 6: Commit and PR
@@ -122,7 +134,7 @@ def get_items(page: int, limit: int):
 ## Troubleshooting
 
 ### Error: Can't reproduce the bug locally
-- Check environment differences (Python version, OS, dependencies)
+- Check environment differences (Python version, OS, dependencies, timezone, locale)
 - Add debug logging at the failure point
 - Try running with the exact same data/input as the report
 
@@ -130,6 +142,7 @@ def get_items(page: int, limit: int):
 - Your fix may have changed shared behavior. Check test assumptions.
 - Run the full test suite, not just the new test
 - Consider if the other tests were relying on buggy behavior
+- Look for shared mutable state between tests (module globals, caches, rate limiters, a shared DB)
 
 ### Error: RCA seems like overkill for a simple bug
 - Spend 10 minutes on RCA even for "obvious" bugs - they're rarely obvious
