@@ -118,6 +118,12 @@ jobs:
       - name: Mypy (discord-ralph-recap)
         run: mypy .claude/skills/discord-ralph-recap/scripts/
 
+      - name: Mypy (decide)
+        run: mypy .claude/skills/decide/scripts/
+
+      - name: Mypy (scan-issue-writer)
+        run: mypy .claude/skills/scan-issue-writer/scripts/
+
       - name: Mypy (tests)
         run: mypy tests/
 

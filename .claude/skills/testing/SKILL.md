@@ -8,7 +8,7 @@ description: >-
   Do NOT use for mutation testing specifics (use mutation-testing skill).
 metadata:
   author: Geoff
-  version: 1.0.0
+  version: 1.1.0
 ---
 
 # Testing
@@ -52,10 +52,10 @@ See `references/examples.md` for complete test suite examples.
 class TestConfigLoader:
     def test_load_valid_config_returns_parsed_data(self, tmp_path: Path) -> None:
         config_file = tmp_path / "config.json"
-        config_file.write_text('{"api_key": "test123", "timeout": 30}')
+        config_file.write_text('{"api_key": "test123", "timeout": 30}')  # pragma: allowlist secret
         loader = ConfigLoader()
         result = loader.load(config_file)
-        assert result["api_key"] == "test123"
+        assert result["api_key"] == "test123"  # pragma: allowlist secret
         assert result["timeout"] == 30
 
     @pytest.mark.parametrize("content,expected_error", [
@@ -80,9 +80,9 @@ func TestValidateConfig(t *testing.T) {
         wantErr bool
         errMsg  string
     }{
-        {"valid config", Config{APIKey: "test", Timeout: 30}, false, ""},
-        {"missing key", Config{APIKey: "", Timeout: 30}, true, "api_key is required"},
-        {"bad timeout", Config{APIKey: "test", Timeout: 0}, true, "timeout must be positive"},
+        {"valid config", Config{APIKey: "test", Timeout: 30}, false, ""},  // pragma: allowlist secret
+        {"missing key", Config{APIKey: "", Timeout: 30}, true, "api_key is required"},     // pragma: allowlist secret
+        {"bad timeout", Config{APIKey: "test", Timeout: 0}, true, "timeout must be positive"},  // pragma: allowlist secret
     }
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
@@ -106,5 +106,16 @@ func TestValidateConfig(t *testing.T) {
 ### Error: Tests are flaky (sometimes pass, sometimes fail)
 - Look for shared state between tests
 - Check for test order dependencies (use pytest-randomly)
-- Mock time-dependent code
+- Mock time-dependent code with a fake clock; pin it to midday (e.g. `12:00`), not midnight, so timezone offsets can't roll the date
 - Avoid sleep() in tests - use polling with timeout
+- Avoid real network calls - mock API responses
+- UI tests: wrap async state updates in `act()` / await the framework's `waitFor`, and mock native or platform modules the test environment lacks
+
+### Error: Secret scanner flags test fixtures
+- Fake credentials in fixtures (`"api_key": "test123"`) trip detect-secrets-style hooks <!-- pragma: allowlist secret -->
+- Mark the line with `# pragma: allowlist secret` (or `// pragma: allowlist secret`) - test fixtures only, never real code
+- Prefer obviously fake values so a reviewer can tell at a glance
+
+### Error: Validation errors (e.g. HTTP 422) with no clue why
+- Print or assert on the response body - it names the failing field
+- Compare the test payload against the current request schema; fields may have been added, renamed, or made required

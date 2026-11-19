@@ -8,10 +8,11 @@ description: >-
   that plans work as local phase files rather than GitHub issues. Do NOT use in
   a project whose backlog lives in GitHub issues (use the Ralph loop —
   `.claude/commands/ralph-tick.md` — instead), for generating the roadmap
-  itself (use `triage-and-plan`), or for a quick status readout (use `status`).
+  itself (use `triage-and-plan`), for a quick status readout (use `status`), or for a human-only console or
+  ops ticket (use walkthrough).
 metadata:
   author: Geoff
-  version: 1.0.0
+  version: 1.1.0
 ---
 # Continue Epic
 
