@@ -106,7 +106,7 @@ def test_citations_accepts_string_list_and_absent_symbol() -> None:
 
 
 def test_citations_rejects_non_object() -> None:
-    with pytest.raises(ValueError, match="expected an object"):
+    with pytest.raises(TypeError, match="expected an object"):
         vsc._citations("[1, 2]")
 
 

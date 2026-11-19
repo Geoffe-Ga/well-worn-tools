@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify that every symbol a scan finding cites exists at the scan SHA.
+r"""Verify that every symbol a scan finding cites exists at the scan SHA.
 
 Scan agents paraphrase. Given a file and a line range, a model will happily
 cite ``_unique_filename`` when the code says ``_generate_filename``, or
@@ -35,8 +35,8 @@ Exit status: 0 when every cited symbol resolves, 1 otherwise.
 
 Usage::
 
-    printf '%s\\n' "$FINDINGS_NDJSON" \\
-      | SCAN_SHA="$(git rev-parse HEAD)" \\
+    printf '%s\n' "$FINDINGS_NDJSON" \
+      | SCAN_SHA="$(git rev-parse HEAD)" \
         python3 .claude/skills/scan-issue-writer/scripts/verify_scan_citations.py
 
 This check is language-agnostic and deliberately cheap: it proves a name
@@ -49,6 +49,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -60,6 +61,11 @@ _DEF_KEYWORDS = (
 
 # A cited line range: "120" or "120-164".
 _RANGE_RE = re.compile(r"^\s*(\d+)(?:\s*-\s*(\d+))?\s*$")
+
+
+def _emit(message: str) -> None:
+    """Write one line of output (GitHub Actions annotations included)."""
+    sys.stdout.write(f"{message}\n")
 
 
 def _definition_re(name: str) -> re.Pattern[str]:
@@ -83,10 +89,23 @@ def _definition_re(name: str) -> re.Pattern[str]:
     return re.compile("|".join(f"(?:{p})" for p in patterns), re.MULTILINE)
 
 
+def _git() -> str:
+    """Return the absolute path of the git executable.
+
+    Raises:
+        FileNotFoundError: If git is not on PATH.
+    """
+    git = shutil.which("git")
+    if git is None:
+        msg = "git is required to read files at the scan SHA"
+        raise FileNotFoundError(msg)
+    return git
+
+
 def _blob_at(sha: str, path: str) -> str | None:
     """Return *path* as of *sha*, or None when it cannot be read."""
     result = subprocess.run(
-        ["git", "show", f"{sha}:{path}"],
+        [_git(), "show", f"{sha}:{path}"],
         capture_output=True,
         text=True,
         check=False,
@@ -98,12 +117,13 @@ def _citations(line: str) -> list[tuple[str, str, str]]:
     """Return ``(file, symbol, lines)`` triples from one findings line.
 
     Raises:
-        ValueError: If the line is not a JSON object.
+        ValueError: If the line is not valid JSON.
+        TypeError: If the line is JSON but not an object.
     """
     finding = json.loads(line)
     if not isinstance(finding, dict):
         msg = f"finding is {type(finding).__name__}, expected an object"
-        raise ValueError(msg)
+        raise TypeError(msg)
     symbols = finding.get("symbol") or finding.get("symbols") or []
     if isinstance(symbols, str):
         symbols = [symbols]
@@ -153,7 +173,7 @@ def main() -> int:
     sha = (
         os.environ.get("SCAN_SHA")
         or subprocess.run(
-            ["git", "rev-parse", "HEAD"],
+            [_git(), "rev-parse", "HEAD"],
             capture_output=True,
             text=True,
             check=True,
@@ -167,20 +187,20 @@ def main() -> int:
         read += 1
         try:
             triples = _citations(line)
-        except ValueError as exc:  # json.JSONDecodeError is a ValueError
-            print(f"::error::malformed finding JSON: {exc}")
+        except (ValueError, TypeError) as exc:  # JSONDecodeError is a ValueError
+            _emit(f"::error::malformed finding JSON: {exc}")
             failures += 1
             continue
         for path, symbol, lines in triples:
             checked += 1
             verdict, message = _check(sha, path, symbol, lines)
             if verdict in {"ERROR", "PHANTOM"}:
-                print(f"::error::{verdict} {message}")
+                _emit(f"::error::{verdict} {message}")
                 failures += 1
             elif verdict == "WARN":
-                print(f"::warning::{message}")
+                _emit(f"::warning::{message}")
     if failures:
-        print(
+        _emit(
             f"::error::{failures} unverifiable or phantom citation(s) at "
             f"{sha[:12]}; refusing to file. Re-resolve each against the scan "
             "SHA and cite the real name, or drop the symbol."
@@ -188,12 +208,12 @@ def main() -> int:
         return 1
     if read and not checked:
         # A gate that checked nothing must not read like a clean pass.
-        print(
+        _emit(
             f"::warning::read {read} finding(s) but checked 0 symbols. Any "
             "finding that names a function, class or method MUST declare a "
             "symbol field."
         )
-    print(f"verify-scan-citations: {checked} symbol citation(s) verified at {sha[:12]}")
+    _emit(f"verify-scan-citations: {checked} symbol citation(s) verified at {sha[:12]}")
     return 0
 
 

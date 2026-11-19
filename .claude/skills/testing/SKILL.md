@@ -112,7 +112,7 @@ func TestValidateConfig(t *testing.T) {
 - UI tests: wrap async state updates in `act()` / await the framework's `waitFor`, and mock native or platform modules the test environment lacks
 
 ### Error: Secret scanner flags test fixtures
-- Fake credentials in fixtures (`"api_key": "test123"`) trip detect-secrets-style hooks
+- Fake credentials in fixtures (`"api_key": "test123"`) trip detect-secrets-style hooks <!-- pragma: allowlist secret -->
 - Mark the line with `# pragma: allowlist secret` (or `// pragma: allowlist secret`) - test fixtures only, never real code
 - Prefer obviously fake values so a reviewer can tell at a glance
 

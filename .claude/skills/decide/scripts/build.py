@@ -57,6 +57,7 @@ COLOR_TOKENS = (
 FONT_TOKENS = {"display": "font-display", "body": "font-body", "mono": "font-mono"}
 SEVERITIES = {"low", "medium", "high"}
 RESERVED_IDS = {"__defer", "__other"}
+MIN_OPTIONS = 2
 
 
 class SheetError(ValueError):
@@ -79,7 +80,7 @@ def _check_text(obj: dict[str, Any], key: str, where: str, problems: list[str], 
         problems.append(f"{where}: '{key}' must be a non-empty string")
 
 
-def _check_matrix(rows: Any, row_key: str, option_ids: set[str], where: str, problems: list[str]) -> None:
+def _check_matrix(rows: object, row_key: str, option_ids: set[str], where: str, problems: list[str]) -> None:
     """Check a trade-off or cost matrix: labeled rows, one cell per option."""
     if rows is None:
         return
@@ -104,7 +105,7 @@ def _check_matrix(rows: Any, row_key: str, option_ids: set[str], where: str, pro
 def _check_options(d: dict[str, Any], where: str, problems: list[str]) -> set[str]:
     """Validate a decision's options and return their ids."""
     options = d.get("options")
-    if not isinstance(options, list) or len(options) < 2:
+    if not isinstance(options, list) or len(options) < MIN_OPTIONS:
         problems.append(f"{where}: 'options' needs at least two choices")
         return set()
     ids: set[str] = set()
@@ -129,7 +130,7 @@ def _check_options(d: dict[str, Any], where: str, problems: list[str]) -> set[st
     return ids
 
 
-def _check_risks(risks: Any, option_ids: set[str], where: str, problems: list[str]) -> None:
+def _check_risks(risks: object, option_ids: set[str], where: str, problems: list[str]) -> None:
     """Check each risk has a severity, a mitigation, and only known option ids."""
     if risks is None:
         return
@@ -149,7 +150,7 @@ def _check_risks(risks: Any, option_ids: set[str], where: str, problems: list[st
             problems.append(f"{spot}: unknown option id(s) {unknown}")
 
 
-def _check_examples(examples: Any, where: str, problems: list[str]) -> None:
+def _check_examples(examples: object, where: str, problems: list[str]) -> None:
     """Check optional examples: each needs a name, and any URL must be https."""
     if examples is None:
         return
@@ -167,7 +168,7 @@ def _check_examples(examples: Any, where: str, problems: list[str]) -> None:
             problems.append(f"{spot}: 'url' must start with https://")
 
 
-def _check_decision(d: Any, i: int, seen: set[str], problems: list[str]) -> None:
+def _check_decision(d: object, i: int, seen: set[str], problems: list[str]) -> None:
     """Validate one decision and record its id in seen to catch duplicates."""
     where = f"decisions[{i}]"
     if not isinstance(d, dict):
@@ -205,16 +206,8 @@ def _check_decision(d: Any, i: int, seen: set[str], problems: list[str]) -> None
             problems.append(f"{where}: '{key}' is empty; every decision needs {label}")
 
 
-def _check_theme(theme: Any, problems: list[str]) -> None:
-    """Validate the DESIGN.md theme: plain colors, font stacks, lengths only."""
-    if theme is None:
-        return
-    if not isinstance(theme, dict):
-        problems.append("theme: must be an object")
-        return
-    allowed = {"light", "dark", "fonts", "fontsUrl", "radius", "source"}
-    for key in sorted(set(theme) - allowed):
-        problems.append(f"theme: unknown key '{key}'")
+def _check_palettes(theme: dict[str, Any], problems: list[str]) -> None:
+    """Check the light and dark palettes hold only known tokens and plain colors."""
     for mode in ("light", "dark"):
         palette = theme.get(mode, {})
         if not isinstance(palette, dict):
@@ -222,18 +215,35 @@ def _check_theme(theme: Any, problems: list[str]) -> None:
             continue
         for token, value in palette.items():
             if token not in COLOR_TOKENS:
-                problems.append(f"theme.{mode}: unknown token '{token}' (allowed: {', '.join(COLOR_TOKENS)})")
+                allowed = ", ".join(COLOR_TOKENS)
+                problems.append(f"theme.{mode}: unknown token '{token}' (allowed: {allowed})")
             elif not isinstance(value, str) or not COLOR_RE.match(value.strip()):
                 problems.append(f"theme.{mode}.{token}: '{value}' is not a plain CSS color")
-    fonts = theme.get("fonts", {})
+
+
+def _check_fonts(fonts: object, problems: list[str]) -> None:
+    """Check font roles are known and each value is a plain font stack."""
     if not isinstance(fonts, dict):
         problems.append("theme.fonts: must be an object")
-    else:
-        for role, value in fonts.items():
-            if role not in FONT_TOKENS:
-                problems.append(f"theme.fonts: unknown role '{role}' (allowed: display, body, mono)")
-            elif not isinstance(value, str) or not FONT_RE.match(value):
-                problems.append(f"theme.fonts.{role}: not a plain font stack")
+        return
+    for role, value in fonts.items():
+        if role not in FONT_TOKENS:
+            problems.append(f"theme.fonts: unknown role '{role}' (allowed: display, body, mono)")
+        elif not isinstance(value, str) or not FONT_RE.match(value):
+            problems.append(f"theme.fonts.{role}: not a plain font stack")
+
+
+def _check_theme(theme: object, problems: list[str]) -> None:
+    """Validate the DESIGN.md theme: plain colors, font stacks, lengths only."""
+    if theme is None:
+        return
+    if not isinstance(theme, dict):
+        problems.append("theme: must be an object")
+        return
+    allowed = {"light", "dark", "fonts", "fontsUrl", "radius", "source"}
+    problems.extend(f"theme: unknown key '{key}'" for key in sorted(set(theme) - allowed))
+    _check_palettes(theme, problems)
+    _check_fonts(theme.get("fonts", {}), problems)
     url = theme.get("fontsUrl")
     if url is not None and (not isinstance(url, str) or not FONTS_URL_RE.match(url)):
         problems.append(f"theme.fontsUrl: must be a {FONTS_URL_PREFIX}… stylesheet URL")
@@ -242,7 +252,7 @@ def _check_theme(theme: Any, problems: list[str]) -> None:
         problems.append("theme.radius: must be a length like '8px' or '0.5rem'")
 
 
-def validate(sheet: Any) -> None:
+def validate(sheet: object) -> None:
     """Raise SheetError listing every problem in the sheet; return None when valid."""
     problems: list[str] = []
     if not isinstance(sheet, dict):
@@ -285,8 +295,13 @@ def theme_css(theme: dict[str, Any] | None) -> str:
     dark = dict(theme.get("dark", {}))
     if dark:
         body = block(dark, " color-scheme: dark;")
-        parts.append(f'@media (prefers-color-scheme: dark) {{ :root:not([data-theme="light"]) {{ {body} }} }}')
-        parts.append(f':root[data-theme="dark"] {{ {body} }}')
+        dark_query = '@media (prefers-color-scheme: dark) { :root:not([data-theme="light"])'
+        parts.extend(
+            (
+                f"{dark_query} {{ {body} }} }}",
+                f':root[data-theme="dark"] {{ {body} }}',
+            )
+        )
     return "\n".join(parts)
 
 
@@ -326,16 +341,16 @@ def main(argv: list[str] | None = None) -> int:
     try:
         sheet = json.loads(args.sheet.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        print(f"Could not read {args.sheet}: {exc}", file=sys.stderr)
+        sys.stderr.write(f"Could not read {args.sheet}: {exc}\n")
         return 1
     try:
         validate(sheet)
     except SheetError as exc:
-        print(f"{args.sheet} has {len(exc.problems)} problem(s):\n{exc}", file=sys.stderr)
+        sys.stderr.write(f"{args.sheet} has {len(exc.problems)} problem(s):\n{exc}\n")
         return 1
     out = args.out or args.sheet.with_suffix(".html")
     out.write_text(render(sheet, TEMPLATE.read_text(encoding="utf-8")), encoding="utf-8")
-    print(out)
+    sys.stdout.write(f"{out}\n")
     return 0
 
 
