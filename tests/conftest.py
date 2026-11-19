@@ -17,6 +17,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DISTRIBUTE_DIR = REPO_ROOT / ".claude/skills/distribute-skills/scripts"
 COLLECT_DIR = REPO_ROOT / ".claude/skills/collect-skills/scripts"
 RALPH_RECAP_DIR = REPO_ROOT / ".claude/skills/discord-ralph-recap/scripts"
+SCAN_WRITER_DIR = REPO_ROOT / ".claude/skills/scan-issue-writer/scripts"
 
 
 def _load(name: str, path: Path) -> ModuleType:
@@ -34,6 +35,7 @@ distribute = _load("ww_distribute", DISTRIBUTE_DIR / "distribute.py")
 distribute_discover = _load("ww_distribute_discover", DISTRIBUTE_DIR / "discover.py")
 collect_adapt = _load("ww_collect_adapt", COLLECT_DIR / "adapt.py")
 ralph_stats = _load("ww_ralph_stats", RALPH_RECAP_DIR / "stats.py")
+scan_citations = _load("ww_scan_citations", SCAN_WRITER_DIR / "verify_scan_citations.py")
 
 # recap.py does a bare `import stats` (a sibling-module import, since both
 # scripts live side by side in the skill's scripts/ dir) - put that directory
